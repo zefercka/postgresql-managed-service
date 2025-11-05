@@ -1,0 +1,15 @@
+from app.src.dependency.exceptions import NotFoundError
+from fastapi import HTTPException, status
+
+
+class NotFoundClusterError(NotFoundError):
+    def __init__(self, cluster_id: str):
+        super().__init__(detail=f"Кластер PostgreSQL c ID '{cluster_id}' не найден")
+
+
+class InvalidVersionError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Выбранная версия PostgreSQL не поддерживается",
+        )

@@ -1,4 +1,12 @@
-.venv
+# Python
+.venv*
 __pycache__
+
+# Configuration
 keys
 *.env
+
+# Terraform
+.terraform*
+terraform.tfstate
+terraform.tfvars.json

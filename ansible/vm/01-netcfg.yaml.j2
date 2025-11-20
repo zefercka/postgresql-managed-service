@@ -1,0 +1,11 @@
+network:
+  version: 2
+  ethernets:
+    eth0:
+      optional: true
+      dhcp4: false
+      addresses:
+        - {{ new_ip }}/{{ netmask }}
+      gateway4: {{ gateway }}
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1]

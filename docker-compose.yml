@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ms-postgres-db
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_managed_service
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - managed_service_network
+
+  rabbitmq:
+    image: rabbitmq:4.2-management
+    container_name: ms-rabbitmq
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+    env_file:
+      - "./.server.env"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - managed_service_network
+
+  ansible:
+    build:
+      context: .
+      dockerfile: ./ansible/Dockerfile
+    container_name: ms-ansible
+    networks:
+      - managed_service_network
+
+  terraform:
+    build:
+      context: .
+      dockerfile: ./terraform/Dockerfile
+    container_name: ms-terraform
+    env_file:
+      - "./.server.env"
+    volumes:
+      - ./terraform/vm_template.tf:/opt/postgresql-managed-service/terraform/vm_template.tf
+      - ./terraform/variables.tf:/opt/postgresql-managed-service/terraform/variables.tf
+      - ./ansible/vm:/opt/postgresql-managed-service/ansible/vm
+      - terraform_data:/opt/postgresql-managed-service
+    networks:
+      - managed_service_network
+
+volumes:
+  pgdata:
+  rabbitmq_data:
+  terraform_data:
+
+networks:
+  managed_service_network:
+    driver: bridge

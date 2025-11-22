@@ -1,6 +1,6 @@
 from app.src.database.declarations import ClusterStatusEnum
 from app.src.database.models import Cluster, PostgresVersion
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,7 +32,9 @@ class ClusterRepository(BaseRepository[Cluster]):
         show_deleted: bool = False,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[Cluster]:
+    ) -> set[list[Cluster], int]:
+        print(user_id)
+
         query = (
             select(Cluster)
             .where(
@@ -47,7 +49,19 @@ class ClusterRepository(BaseRepository[Cluster]):
             query = query.where(Cluster.status_id != ClusterStatusEnum.DELETED)
 
         result = await session.execute(query)
-        return result.scalars().all()
+        clusters = result.scalars().all()
+
+        query = select(func.count(Cluster.id)).where(
+            Cluster.owner_id == user_id,
+        )
+
+        if not show_deleted:
+            query = query.where(Cluster.status_id != ClusterStatusEnum.DELETED)
+
+        result = await session.execute(query)
+        total = result.scalar_one()
+
+        return clusters, total
 
 
 class PostgresVersionRepository(BaseRepository[PostgresVersion]):

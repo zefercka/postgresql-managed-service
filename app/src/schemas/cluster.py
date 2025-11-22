@@ -34,3 +34,10 @@ class Cluster(BaseCluster):
     deleted_at: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+
+class GetClustersResponse(BaseModel):
+    clusters: list[Cluster]
+    total: int = Field(description="Всего кластеров у пользователя")
+
+    model_config = ConfigDict(from_attributes=True)

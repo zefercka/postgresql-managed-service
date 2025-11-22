@@ -1,6 +1,6 @@
 from app.src.database import AsyncDbSession
 from app.src.dependency.auth import CurrentUser
-from app.src.schemas.cluster import Cluster, CreateCluster
+from app.src.schemas.cluster import Cluster, CreateCluster, GetClustersResponse
 from fastapi import APIRouter
 
 from . import service
@@ -38,7 +38,7 @@ async def update_cluster(
 @app.get("", summary="Получить список кластеров текущего пользователя")
 async def get_clusters(
     session: AsyncDbSession, current_user: CurrentUser, limit: int = 8, offset: int = 0
-) -> list[Cluster]:
+) -> GetClustersResponse:
     clusters = await service.get_clusters(session, current_user, limit, offset)
 
     return clusters

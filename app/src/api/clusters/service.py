@@ -2,7 +2,7 @@ from app.src.database import models
 from app.src.database.declarations.cluster import ClusterStatusEnum
 from app.src.database.repository import ClusterRepository, PostgresVersionRepository
 from app.src.dependency import helpers
-from app.src.schemas.cluster import Cluster, CreateCluster
+from app.src.schemas.cluster import Cluster, CreateCluster, GetClustersResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.src.tasks.create_vm_task import create_vm_task
 
@@ -77,14 +77,17 @@ async def update_cluster(
 
 async def get_clusters(
     session: AsyncSession, current_user: models.User, limit: int, offset: int
-) -> list[Cluster]:
+) -> GetClustersResponse:
     """
     Возвращает список кластеров, владельцем которых является текущий
     пользователь
     """
 
-    clusters = await ClusterRepository.find_user_clusters(
+    clusters, total = await ClusterRepository.find_user_clusters(
         session, current_user.id, False, limit, offset
     )
 
-    return [Cluster.model_validate(cluster) for cluster in clusters]
+    return GetClustersResponse.model_validate({
+        "clusters": [cluster for cluster in clusters],
+        "total": total,
+    })

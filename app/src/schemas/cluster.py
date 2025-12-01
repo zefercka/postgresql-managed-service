@@ -41,7 +41,7 @@ class Cluster(BaseCluster):
     username: Optional[str] = Field(default=None)
     password: Optional[str] = Field(default=None)
     host_fqdn: Optional[str] = Field(default=None)
-    postgres_port: Optional[str] = Field(default=None, serialization_alias="port")
+    postgres_port: Optional[int] = Field(default=None, serialization_alias="port")
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime]

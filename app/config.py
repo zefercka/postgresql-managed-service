@@ -34,6 +34,8 @@ class Config(BaseSettings):
     RABBITMQ_VHOST: str
 
     TERRAFORM_DIR: str
+    
+    VM_SOURCE_DISK_PATH: str
 
     # Путь до приватного ключами для подключения по SSH к серверам
     SERVERS_KEY_PATH: str = "./keys/servers/ssh_key"
@@ -56,10 +58,6 @@ class Config(BaseSettings):
             f"{self.RABBITMQ_DEFAULT_USER}:{self.RABBITMQ_DEFAULT_PASS}@"
             f"{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/{self.RABBITMQ_VHOST}"
         )
-
-    @property
-    def ISO_VM_FILE_FULL_PATH(self):
-        return Path(self.ISO_VM_FILE).resolve()
 
     @property
     def TERRAFORM_DIR_FULL_PATH(self):

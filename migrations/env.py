@@ -12,7 +12,15 @@ sys.path.append(abspath(join(dirname(__file__), "..", "..")))
 
 from app.config import settings
 from app.src.database import Base
-from app.src.database.models import Cluster, ClusterStatus, PostgresVersion, User
+from app.src.database.models import (
+    Cluster,
+    ClusterStatus,
+    HypervHost,
+    HypervHostAudit,
+    HypervHostStatus,
+    PostgresVersion,
+    User,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

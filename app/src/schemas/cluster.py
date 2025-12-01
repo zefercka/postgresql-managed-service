@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.src.database import models
+from app.src.database.declarations.cluster import ClusterStatusEnum
 
 
 class BaseCluster(BaseModel):
@@ -24,20 +27,47 @@ class ClusterStatus(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ClusterMinimal(BaseCluster):
+    id: str
+    status: ClusterStatus
+
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+
 class Cluster(BaseCluster):
     id: str
     status: ClusterStatus
-    endpoint: Optional[str] = Field(description="Адрес для подключения")
-    port: Optional[int] = Field(description="Порт на котором запущен PostgreSQL")
+    connection_string: Optional[str] = Field(default=None)
+    username: Optional[str] = Field(default=None)
+    password: Optional[str] = Field(default=None)
+    host_fqdn: Optional[str] = Field(default=None)
+    postgres_port: Optional[str] = Field(default=None, serialization_alias="port")
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
+    @model_validator(mode="after")
+    def generate_connect_string(self):
+        if all(
+            [
+                self.username,
+                self.host_fqdn,
+                self.postgres_port,
+                self.name,
+                self.password,
+            ]
+        ):
+            self.connection_string = (
+                f"{self.username}@{self.host_fqdn}:{self.postgres_port}/{self.name}"
+            )
+
+        return self
+
 
 class GetClustersResponse(BaseModel):
-    clusters: list[Cluster]
+    clusters: list[ClusterMinimal]
     total: int = Field(description="Всего кластеров у пользователя")
 
     model_config = ConfigDict(from_attributes=True)

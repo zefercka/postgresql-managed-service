@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.src.database import Base
-from app.src.database.declarations import ClusterStatusEnum
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.src.database import Base
+from app.src.database.declarations import ClusterStatusEnum
 
 
 class ClusterStatus(Base):
@@ -30,7 +31,7 @@ class PostgresVersion(Base):
 class Cluster(Base):
     __tablename__ = "clusters"
 
-    id: Mapped[int] = mapped_column(
+    id: Mapped[str] = mapped_column(
         String(36),
         primary_key=True,
         autoincrement=False,
@@ -61,18 +62,27 @@ class Cluster(Base):
     cpu: Mapped[int] = mapped_column(comment="Количество vCPU на хосте кластера")
     ram_mb: Mapped[int] = mapped_column(comment="Объём ОЗУ в МБ")
     storage_gb: Mapped[int] = mapped_column(comment="Объём диска для хранилища в ГБ")
-    endpoint: Mapped[Optional[str]] = mapped_column(comment="Адрес для подключения")
-    port: Mapped[Optional[int]] = mapped_column(
-        comment="Порт на котором запущен PostgreSQL"
+    hyperv_host_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("hyperv_hosts.id", onupdate="restrict", ondelete="restrict"),
+        comment="Хост Hyper-V, на котором размещён кластер",
+    )
+    postgres_port: Mapped[Optional[int]] = mapped_column(
+        comment="Порт хоста на который прокинут PostgreSQL порт из вм"
+    )
+    ssh_port: Mapped[Optional[int]] = mapped_column(
+        comment="Порт хоста на который прокинут ssh порт из вм"
+    )
+    host_fqdn: Mapped[Optional[str]] = mapped_column(
+        comment="Адрес ВМ внутри NAT сети"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

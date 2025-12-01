@@ -1,7 +1,12 @@
+from fastapi import APIRouter
+
 from app.src.database import AsyncDbSession
 from app.src.dependency.auth import CurrentUser
-from app.src.schemas.cluster import Cluster, CreateCluster, GetClustersResponse
-from fastapi import APIRouter
+from app.src.schemas.cluster import (
+    Cluster,
+    CreateCluster,
+    GetClustersResponse,
+)
 
 from . import service
 

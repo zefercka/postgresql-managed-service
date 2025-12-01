@@ -13,3 +13,10 @@ class InvalidVersionError(HTTPException):
             status.HTTP_400_BAD_REQUEST,
             detail="Выбранная версия PostgreSQL не поддерживается",
         )
+
+
+class NoAvailableResourcesError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status.HTTP_409_CONFLICT, "Нет доступных ресурсов для создания кластера"
+        )

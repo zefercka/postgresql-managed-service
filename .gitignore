@@ -7,6 +7,14 @@ keys
 *.env
 
 # Terraform
-.terraform*
+.terraform
+.terraform.lock.hcl
 terraform.tfstate
 terraform.tfvars.json
+
+# Vault
+vault-init.json
+vault-keys-backup.json
+vault/init/
+vault-backups/
+*.unsealed

@@ -33,7 +33,21 @@ class ClusterRepository(BaseRepository[Cluster]):
         limit: int = 50,
         offset: int = 0,
     ) -> set[list[Cluster], int]:
-        print(user_id)
+        """Возвращает список кластеров, владельцем которых является
+        пользователь, и общее кол-во кластеров пользователя
+
+        Args:
+            session (AsyncSession): Сессия БД
+            user_id (int): Идентификатор пользователя
+            show_deleted (bool, optional): Показывать ли удалённые
+            кластеры. По умолчанию False.
+            limit (int, optional): Лимит по выборке. По умолчанию 50.
+            offset (int, optional): Сдвиг по выборке. По умолчанию 0.
+
+        Returns:
+            set[list[Cluster], int]: Кластеры и общее кол-во кластеров
+            пользователя
+        """
 
         query = (
             select(Cluster)

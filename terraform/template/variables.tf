@@ -1,12 +1,11 @@
-variable "hyperv_hosts" {
+variable "hyperv_host" {
   description = "Параметры хостов для создания ВМ"
-  type = map(object({
-    host     = string
-    port     = number
-    user     = string
-    password = string
-    https    = bool
-  }))
+  type = object({
+    id    = number
+    host  = string
+    port  = number
+    https = bool
+  })
 }
 
 variable "vms" {
@@ -15,6 +14,7 @@ variable "vms" {
     cpu              = number
     memory           = number
     source_disk_path = string
+    disk_size        = number
     host             = string
   }))
   default = {}
@@ -37,7 +37,7 @@ variable "netmask" {
 
 variable "ssh_key" {
   type    = string
-  default = "../keys/servers/ssh_key"
+  default = "/root/.ssh/id_rsa"
 }
 
 variable "base_ip" {
@@ -53,4 +53,9 @@ variable "base_user" {
 variable "proxied_ssh_port" {
   type    = string
   default = "22222"
+}
+
+variable "vault_token_file" {
+  type = string
+  default = "/vault/token"
 }

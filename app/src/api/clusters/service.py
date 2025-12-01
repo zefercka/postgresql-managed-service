@@ -1,12 +1,26 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.src.database import models
 from app.src.database.declarations.cluster import ClusterStatusEnum
-from app.src.database.repository import ClusterRepository, PostgresVersionRepository
+from app.src.database.repository import (
+    ClusterRepository,
+    HypervHostRepository,
+    PostgresVersionRepository,
+)
 from app.src.dependency import helpers
-from app.src.schemas.cluster import Cluster, CreateCluster, GetClustersResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.src.tasks.create_vm_task import create_vm_task
+from app.src.schemas.cluster import (
+    Cluster,
+    ClusterMinimal,
+    CreateCluster,
+    GetClustersResponse,
+)
+from app.src.tasks.create_vm_task import create_vm_task, rollback_tfvars_file
 
-from .exceptions import InvalidVersionError, NotFoundClusterError
+from .exceptions import (
+    InvalidVersionError,
+    NoAvailableResourcesError,
+    NotFoundClusterError,
+)
 
 
 async def create_cluster(
@@ -26,9 +40,27 @@ async def create_cluster(
     data["id"] = helpers.generate_cluster_id()
     data["owner_id"] = current_user.id
 
+    host = await HypervHostRepository.find_host_with_resources(
+        session, cluster.cpu, cluster.storage_gb, cluster.ram_mb
+    )
+
+    if host is None:
+        raise NoAvailableResourcesError
+
+    data["hyperv_host_id"] = host.id
     new_cluster = await ClusterRepository.add(session, **data)
 
-    create_vm_task.send(new_cluster.id)
+    await HypervHostRepository.update(
+        session,
+        host.id,
+        free_storage=host.free_storage - new_cluster.storage_gb,
+        free_ram=host.free_ram - new_cluster.ram_mb,
+        free_cpu=host.free_cpu - new_cluster.cpu,
+    )
+
+    create_vm_task.send_with_options(
+        args=(new_cluster.id,), delay=1000, on_failure=rollback_tfvars_file
+    )
 
     return Cluster.model_validate(new_cluster)
 
@@ -87,7 +119,9 @@ async def get_clusters(
         session, current_user.id, False, limit, offset
     )
 
-    return GetClustersResponse.model_validate({
-        "clusters": [cluster for cluster in clusters],
-        "total": total,
-    })
+    return GetClustersResponse.model_validate(
+        {
+            "clusters": [cluster for cluster in clusters],
+            "total": total,
+        }
+    )

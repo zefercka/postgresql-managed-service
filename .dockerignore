@@ -1,0 +1,11 @@
+.venv*
+venv
+
+__pycache__
+
+.git/
+.gitignore
+
+terraform.tfstate*
+.terraform.lock.hcl
+.terraform/

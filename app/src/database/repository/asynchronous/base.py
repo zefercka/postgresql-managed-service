@@ -1,6 +1,6 @@
 from typing import Generic, Optional, Type, TypeVar
 
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeMeta
 
@@ -27,7 +27,10 @@ class BaseRepository(Generic[T]):
 
     @classmethod
     async def update(cls, session: AsyncSession, id: int, **data) -> None:
-        query = update(cls.model).where(cls.id == id).values(**data)
+        primary_key_name = cls.model.__table__.primary_key.columns.keys()[0]
+        primary_key_column = getattr(cls.model, primary_key_name)
+
+        query = update(cls.model).where(primary_key_column == id).values(**data)
         await session.execute(query)
 
     @classmethod

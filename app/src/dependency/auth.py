@@ -17,10 +17,12 @@ security = HTTPBearer(
     description="Введите JWT токен (без префикса 'Bearer')",
 )
 
+SecurityDepends = Annotated[HTTPAuthorizationCredentials, Depends(security)]
+
 
 async def get_current_user(
     session: AsyncDbSession,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: SecurityDepends,
 ) -> dict:
     """
     Dependency для получения текущего пользователя из JWT токена.
@@ -68,7 +70,7 @@ async def get_current_user(
 
 async def get_current_user_optional(
     session: AsyncDbSession,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: SecurityDepends,
 ) -> User | None:
     """
     Dependency для опционального получения текущего пользователя из JWT токена.
@@ -119,3 +121,19 @@ async def get_current_user_optional(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 CurrentUserOptional = Annotated[User | None, Depends(get_current_user_optional)]
+
+
+def check_permission_level(permission_level: int):
+    async def _check_permission(current_user: CurrentUser) -> User:
+        if current_user.permission_level >= permission_level:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У пользователя нет прав доступа",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return _check_permission
+
+
+CurrentUserAdmin = Annotated[User, Depends(check_permission_level(2048))]

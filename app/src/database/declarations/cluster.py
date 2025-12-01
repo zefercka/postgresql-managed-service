@@ -14,7 +14,7 @@ class ClusterStatusEnum(IntEnum):
 CLUSTER_STATUSES_DESCRIPTION = {
     ClusterStatusEnum.CREATING: "Создание кластера",
     ClusterStatusEnum.RUNNING: "Кластер работает",
-    ClusterStatusEnum.FAILED: "При работе кластера произошла ошибка и он был остановлен",
+    ClusterStatusEnum.FAILED: "При создании кластера произошла ошибка и он был остановлен. Попробуйте пересоздать его",
     ClusterStatusEnum.STOPPED: "Кластер остановлен",
     ClusterStatusEnum.DELETING: "Кластер удаляется",
     ClusterStatusEnum.DELETED: "Кластер удалён",

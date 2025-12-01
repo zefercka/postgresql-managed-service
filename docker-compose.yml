@@ -47,14 +47,56 @@ services:
     build:
       context: .
       dockerfile: ./terraform/Dockerfile
+      target: final
     container_name: ms-terraform
+    depends_on:
+      - rabbitmq
+      - postgres
+      - vault
     env_file:
       - "./.server.env"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN_FILE=/vault/token
     volumes:
-      - ./terraform/vm_template.tf:/opt/postgresql-managed-service/terraform/vm_template.tf
-      - ./terraform/variables.tf:/opt/postgresql-managed-service/terraform/variables.tf
-      - ./ansible/vm:/opt/postgresql-managed-service/ansible/vm
-      - terraform_data:/opt/postgresql-managed-service
+      - ./terraform/template/vm_template.tf:/opt/postgresql-managed-service/terraform/template/vm_template.tf
+      - ./terraform/template/variables.tf:/opt/postgresql-managed-service/terraform/template/variables.tf
+      - ./ansible/vm/change_vm_ip.yaml:/opt/postgresql-managed-service/ansible/vm/change_vm_ip.yaml
+      - ./ansible/vm/templates/01-netcfg.yaml.j2:/opt/postgresql-managed-service/ansible/vm/templates/01-netcfg.yaml.j2
+      - ./app:/opt/postgresql-managed-service/app
+      - terraform_data:/opt/postgresql-managed-service/terraform
+      - vault_token:/vault:ro
+    networks:
+      - managed_service_network
+
+  vault:
+    build:
+      context: .
+      dockerfile: ./vault/Dockerfile
+    container_name: ms-vault
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_ADDR=http://127.0.0.1:8200
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - vault_data:/vault/data
+      - vault_config:/vault/config
+      - vault_init:/vault/init
+      - vault_logs:/vault/logs
+      - vault_token:/vault:rw
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
     networks:
       - managed_service_network
 
@@ -62,6 +104,11 @@ volumes:
   pgdata:
   rabbitmq_data:
   terraform_data:
+  vault_data:      # Зашифрованное хранилище Vault
+  vault_config:    # Конфигурационные файлы
+  vault_token:     # Токены для межсервисного взаимодействия
+  vault_init:      # Unseal ключи и root token
+  vault_logs:      # Audit логи
 
 networks:
   managed_service_network:

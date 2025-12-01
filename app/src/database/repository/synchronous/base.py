@@ -26,7 +26,10 @@ class BaseRepository(Generic[T]):
 
     @classmethod
     def update(cls, session: Session, id: int, **data) -> None:
-        query = update(cls.model).where(cls.id == id).values(**data)
+        primary_key_name = cls.model.__table__.primary_key.columns.keys()[0]
+        primary_key_column = getattr(cls.model, primary_key_name)
+
+        query = update(cls.model).where(primary_key_column == id).values(**data)
         session.execute(query)
 
     @classmethod

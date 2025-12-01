@@ -3,19 +3,19 @@ import hmac
 import time
 
 from jwt import ExpiredSignatureError, InvalidTokenError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.src.database.repository import UserRepository
 from app.src.dependency import helpers, jwt
 from app.src.schemas.auth import RefreshToken, TelegramAuth, TokenResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .exceptions import (
+    InvalidRefreshTokenError,
     InvalidTokenTypeError,
+    RefreshTokenExpiredError,
     TelegramAuthDataIsOutdatedError,
     TelegramAuthError,
-    InvalidRefreshTokenError,
-    RefreshTokenExpiredError,
 )
 
 
@@ -49,7 +49,9 @@ async def login_via_telegram(
 
     db_user = await UserRepository.find_one_or_none(session, tg_id=telegram_user.id)
     if db_user is None:
-        data = telegram_user.model_dump(include=["id", "first_name", "last_name"])
+        data = telegram_user.model_dump(
+            include=["id", "first_name", "last_name", "username"]
+        )
         data["tg_id"] = data.pop("id")
         data["id"] = helpers.generate_user_id()
 
@@ -66,7 +68,7 @@ async def login_via_telegram(
     )
 
 
-async def refresh_tokens(refresh_token: RefreshToken) -> TokenResponse:
+def refresh_tokens(refresh_token: RefreshToken) -> TokenResponse:
     """
     Обновляет access и refresh токены используя валидный refresh токен
     из тела запроса

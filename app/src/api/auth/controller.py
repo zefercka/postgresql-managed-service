@@ -17,5 +17,5 @@ async def login_via_telegram(
 
 @app.post("/refresh", summary="Обновление токенов")
 async def refresh_tokens(refresh_token: RefreshToken) -> TokenResponse:
-    jwts = await service.refresh_tokens(refresh_token)
+    jwts = service.refresh_tokens(refresh_token)
     return jwts

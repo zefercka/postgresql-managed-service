@@ -172,10 +172,94 @@ services:
     networks:
       - managed_service_network
 
+  grafana:
+    image: grafana/grafana:12.1
+    container_name: ms-grafana
+    deploy:
+      restart_policy: 
+        condition: on-failure
+        delay: 10s
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - managed_service_network
+
+  prometheus:
+    image: prom/prometheus:v3.7.3
+    container_name: ms-prometheus
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus-config.yaml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-remote-write-receiver"
+    networks:
+      - managed_service_network
+  
+  loki:
+    image: grafana/loki:3.5.8
+    container_name: ms-loki
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+    ports:
+      - "3100:3100"
+    networks:
+      - managed_service_network
+  
+  tempo:
+    image: grafana/tempo:main-1fbce80
+    container_name: ms-tempo
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+    ports:
+      - "3200:3200"
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+      - tempo_data:/var/tempo
+    networks:
+      - managed_service_network
+
+  opentelemetry:
+    image: otel/opentelemetry-collector-contrib:0.140.0
+    container_name: ms-opentelemetry
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    environment:
+      - TZ=UTC
+    command: ["--config=/etc/opentelemetry-config.yaml"]
+    volumes:
+      - ./opentelemetry-config.yaml:/etc/opentelemetry-config.yaml
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+    networks:
+      - managed_service_network
+
 volumes:
-  pgdata:
-  rabbitmq_data:
-  terraform_data:
+  pgdata:          # Данные PostgreSQL
+  rabbitmq_data:   # Данные RabbitMQ
+  terraform_data:  # Данные Terraform 
   vault_data:      # Зашифрованное хранилище Vault
   vault_config:    # Конфигурационные файлы
   vault_token:     # Токены для межсервисного взаимодействия

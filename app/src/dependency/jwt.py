@@ -3,9 +3,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
-from app.config import settings
 from cryptography.hazmat.primitives import serialization
 from jwt import ExpiredSignatureError, InvalidTokenError
+
+from app.config import settings
 
 PRIVATE_KEY = serialization.load_pem_private_key(
     Path(settings.KEYS_PATH, "private_key.pem").read_text().encode(), password=None
@@ -16,12 +17,12 @@ PUBLIC_KEY = serialization.load_pem_public_key(
 )
 
 
-def generate_access_token(user_id: int) -> str:
+def generate_access_token(user_id: int, permission_level: int) -> str:
     """Генерирует access JWT для пользователя
 
     Args:
         user_id (int): идентификатор пользователя
-
+        permission_level (int): уровень доступа пользователя
     Returns:
         str: access JWT
     """
@@ -29,6 +30,7 @@ def generate_access_token(user_id: int) -> str:
 
     payload = {
         "sub": str(user_id),
+        "permission_level": permission_level,
         "iat": now.timestamp(),
         "exp": (
             now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -90,6 +92,6 @@ def verify_jwt(token: str) -> dict:
         )
         return payload
     except ExpiredSignatureError:
-        raise ExpiredSignatureError("Token has expired")
+        raise
     except InvalidTokenError:
-        raise InvalidTokenError("Invalid token")
+        raise

@@ -32,8 +32,6 @@ async def login_via_telegram(
     ]
     data_check = "\n".join(data_check_arr)
 
-    print(data_check)
-
     computed_hash = hmac.new(
         settings.HASH_TELEGRAM_BOT_TOKEN, data_check.encode(), hashlib.sha256
     ).hexdigest()
@@ -57,7 +55,7 @@ async def login_via_telegram(
 
         db_user = await UserRepository.add(session, **data)
 
-    access_token = jwt.generate_access_token(db_user.id)
+    access_token = jwt.generate_access_token(db_user.id, db_user.permission_level)
     refresh_token = jwt.generate_refresh_token(db_user.id)
 
     return TokenResponse(
@@ -68,7 +66,9 @@ async def login_via_telegram(
     )
 
 
-def refresh_tokens(refresh_token: RefreshToken) -> TokenResponse:
+async def refresh_tokens(
+    session: AsyncSession, refresh_token: RefreshToken
+) -> TokenResponse:
     """
     Обновляет access и refresh токены используя валидный refresh токен
     из тела запроса
@@ -78,15 +78,20 @@ def refresh_tokens(refresh_token: RefreshToken) -> TokenResponse:
     try:
         payload = jwt.verify_jwt(token)
     except InvalidTokenError:
-        raise InvalidRefreshTokenError
+        raise InvalidRefreshTokenError from None
     except ExpiredSignatureError:
-        raise RefreshTokenExpiredError
+        raise RefreshTokenExpiredError from None
 
     if payload.get("type") != "refresh":
         raise InvalidTokenTypeError
 
     user_id = payload.get("sub")
-    access_token = jwt.generate_access_token(user_id)
+
+    user = await UserRepository.find_one_or_none(session, id=int(user_id))
+    if user is None:
+        raise InvalidRefreshTokenError
+
+    access_token = jwt.generate_access_token(user_id, user.permission_level)
     refresh_token = jwt.generate_refresh_token(user_id)
 
     return TokenResponse(

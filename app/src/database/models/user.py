@@ -5,6 +5,7 @@ from sqlalchemy import BigInteger, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.src.database import Base
+from app.src.database.declarations.user import UserPermissionLevelEnum
 
 
 class User(Base):
@@ -52,4 +53,6 @@ class User(Base):
     notifications_enabled: Mapped[bool] = mapped_column(
         default=True, nullable=False, comment="Включены ли уведомления"
     )
-    permission_level: Mapped[int] = mapped_column(default=1, comment="Уровень доступа")
+    permission_level: Mapped[int] = mapped_column(
+        default=UserPermissionLevelEnum.USER, comment="Уровень доступа"
+    )

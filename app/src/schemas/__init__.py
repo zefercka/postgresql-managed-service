@@ -3,7 +3,13 @@
 """
 
 from .auth import RefreshToken, TelegramAuth, TokenResponse
-from .cluster import Cluster, ClusterMinimal, CreateCluster, GetClustersResponse
+from .cluster import (
+    Cluster,
+    ClusterMinimal,
+    CreateCluster,
+    GetClustersResponse,
+    UpdateCluster,
+)
 from .hyperv_host import CreateHypervHost, HypervHost
 
 __all__ = [
@@ -16,6 +22,7 @@ __all__ = [
     "ClusterMinimal",
     "CreateCluster",
     "GetClustersResponse",
+    "UpdateCluster",
     # HyperV hosts
     "CreateHypervHost",
     "HypervHost",

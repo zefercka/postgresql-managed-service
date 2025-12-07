@@ -1,6 +1,7 @@
+from fastapi import APIRouter
+
 from app.src.database import AsyncDbSession
 from app.src.schemas.auth import RefreshToken, TelegramAuth, TokenResponse
-from fastapi import APIRouter
 
 from . import service
 
@@ -16,6 +17,8 @@ async def login_via_telegram(
 
 
 @app.post("/refresh", summary="Обновление токенов")
-async def refresh_tokens(refresh_token: RefreshToken) -> TokenResponse:
-    jwts = service.refresh_tokens(refresh_token)
+async def refresh_tokens(
+    session: AsyncDbSession, refresh_token: RefreshToken
+) -> TokenResponse:
+    jwts = await service.refresh_tokens(session, refresh_token)
     return jwts

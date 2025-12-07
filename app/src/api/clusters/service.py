@@ -10,13 +10,14 @@ from app.src.database.repository import (
 from app.src.dependency import helpers
 from app.src.schemas.cluster import (
     Cluster,
-    ClusterMinimal,
     CreateCluster,
     GetClustersResponse,
+    UpdateCluster,
 )
 from app.src.tasks.create_vm_task import create_vm_task, rollback_tfvars_file
 
 from .exceptions import (
+    ClusterCantBeChangedError,
     InvalidVersionError,
     NoAvailableResourcesError,
     NotFoundClusterError,
@@ -82,7 +83,7 @@ async def get_cluster(
 async def update_cluster(
     session: AsyncSession,
     current_user: models.User,
-    cluster: CreateCluster,
+    cluster: UpdateCluster,
     cluster_id: str,
 ) -> Cluster:
     """
@@ -98,6 +99,27 @@ async def update_cluster(
     )
     if existed_version is None:
         raise InvalidVersionError
+
+    add_storage = cluster.storage_gb - existed_cluster.storage_gb
+    add_ram = cluster.ram_mb - existed_cluster.ram_mb
+    add_cpu = cluster.cpu - existed_cluster.cpu
+
+    host = await HypervHostRepository.find_one_or_none(
+        session, id=existed_cluster.hyperv_host_id
+    )
+    if host is None:
+        raise NotFoundClusterError(cluster_id)
+
+    if any(
+        [
+            host.free_storage + add_storage < 0,
+            host.free_ram + add_ram < 0,
+            host.free_cpu + add_cpu < 0,
+        ]
+    ):
+        # Недостаточно ресурсов на хосте, пока ничего не меняется, но потом, должен быть
+        # переезд на другой хост
+        raise ClusterCantBeChangedError(cluster_id)
 
     cluster_data = cluster.model_dump()
     await ClusterRepository.update(session, id=cluster_id, **cluster_data)

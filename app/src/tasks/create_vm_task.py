@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 5
 
 
-@dramatiq.actor(max_retries=MAX_RETRIES)
+@dramatiq.actor(max_retries=MAX_RETRIES, queue_name="terraform_queue")
 def create_vm_task(cluster_id: str):
     """
     Задача создания новой виртуальной машины

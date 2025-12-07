@@ -8,13 +8,16 @@ RUN useradd -m -s /bin/bash ansibleuser && \
     echo 'ansibleuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 # Создадим папку для SSH
-RUN mkdir -p /home/ansibleuser/.ssh && chown ansibleuser:ansibleuser /home/ansibleuser/.ssh && chmod 700 /home/ansibleuser/.ssh
+RUN mkdir -p /home/ansibleuser/.ssh && \
+    chown ansibleuser:ansibleuser /home/ansibleuser/.ssh && \
+    chmod 700 /home/ansibleuser/.ssh
 
 # Копируем твой публичный ключ внутрь контейнера
 # Предположим, твой публичный ключ находится рядом с Dockerfile как id_rsa.pub
 COPY keys/servers/ssh_key /home/ansibleuser/.ssh/authorized_keys
 
-RUN chown ansibleuser:ansibleuser /home/ansibleuser/.ssh/authorized_keys && chmod 600 /home/ansibleuser/.ssh/authorized_keys
+RUN chown ansibleuser:ansibleuser /home/ansibleuser/.ssh/authorized_keys && \
+    chmod 600 /home/ansibleuser/.ssh/authorized_keys
 
 # Разрешаем root логин по SSH (опционально)
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config

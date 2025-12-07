@@ -1,4 +1,4 @@
-from typing import Generic, Optional, Type, TypeVar
+from typing import Optional, Type, TypeVar
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import DeclarativeMeta, Session
@@ -6,7 +6,7 @@ from sqlalchemy.orm import DeclarativeMeta, Session
 T = TypeVar("T", bound=DeclarativeMeta)
 
 
-class BaseRepository(Generic[T]):
+class BaseRepository[T]:
     model: Type[T]
 
     @classmethod

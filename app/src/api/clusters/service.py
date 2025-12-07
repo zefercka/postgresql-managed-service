@@ -121,7 +121,7 @@ async def get_clusters(
 
     return GetClustersResponse.model_validate(
         {
-            "clusters": [cluster for cluster in clusters],
+            "clusters": clusters,
             "total": total,
         }
     )

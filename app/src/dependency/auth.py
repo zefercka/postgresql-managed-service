@@ -124,7 +124,7 @@ CurrentUserOptional = Annotated[User | None, Depends(get_current_user_optional)]
 
 
 def check_permission_level(permission_level: int):
-    async def _check_permission(current_user: CurrentUser) -> User:
+    def _check_permission(current_user: CurrentUser) -> User:
         if current_user.permission_level >= permission_level:
             return current_user
         raise HTTPException(

@@ -120,7 +120,7 @@ def write_configuration(
         f.truncate()
 
 
-def run_terraform_apply(cwd: str) -> set[str, int, int]:
+def run_terraform_apply(cwd: str) -> tuple[str, int, int]:
     """Выполняет команды terraform init и terraform apply и возвращает
     ip, ssh_port и postgres_port для созданной ВМ
     """

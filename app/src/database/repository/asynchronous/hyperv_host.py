@@ -70,7 +70,7 @@ class HypervHostRepository(BaseRepository[HypervHost]):
         show_deleted: bool = False,
         limit: int = 50,
         offset: int = 0,
-    ) -> set[list[HypervHost], int]:
+    ) -> tuple[list[HypervHost], int]:
         """Поиск всех HyperV хостов. Возвращает хосты и их общее кол-во
 
         Args:
@@ -79,7 +79,7 @@ class HypervHostRepository(BaseRepository[HypervHost]):
             offset (int, optional): Сдвиг по выборке. По умолчанию 0.
 
         Returns:
-            set[list[HypervHost], int]: Хосты и их общее кол-во
+            tuple[list[HypervHost], int]: Хосты и их общее кол-во
         """
 
         query = (

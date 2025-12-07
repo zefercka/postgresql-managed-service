@@ -32,7 +32,7 @@ class ClusterRepository(BaseRepository[Cluster]):
         show_deleted: bool = False,
         limit: int = 50,
         offset: int = 0,
-    ) -> set[list[Cluster], int]:
+    ) -> tuple[list[Cluster], int]:
         """Возвращает список кластеров, владельцем которых является
         пользователь, и общее кол-во кластеров пользователя
 
@@ -45,7 +45,7 @@ class ClusterRepository(BaseRepository[Cluster]):
             offset (int, optional): Сдвиг по выборке. По умолчанию 0.
 
         Returns:
-            set[list[Cluster], int]: Кластеры и общее кол-во кластеров
+            tuple[list[Cluster], int]: Кластеры и общее кол-во кластеров
             пользователя
         """
 

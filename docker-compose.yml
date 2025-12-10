@@ -1,4 +1,27 @@
 services:
+  server:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: final
+    container_name: ms-server
+    depends_on:
+      - rabbitmq
+      - postgres
+    env_file:
+      - "./.server.env"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/opt/postgresql-managed-service/app
+    networks:
+      - managed_service_network
+
   postgres:
     image: postgres:16
     container_name: ms-postgres-db

@@ -27,7 +27,18 @@
             "durable" : true,
             "auto_delete" : false,
             "arguments" : {
-                "x-dead-letter-exchange" : ""
+                "x-dead-letter-exchange" : "",
+                "x-dead-letter-routing-key" : "terraform_queue.XQ"
+            }
+        },
+        {
+            "name" : "terraform_queue.DQ",
+            "vhost" : "/",
+            "durable" : true,
+            "auto_delete" : false,
+            "arguments" : {
+                "x-dead-letter-exchange" : "",
+                "x-dead-letter-routing-key" : "terraform_queue.XQ"
             }
         },
         {
@@ -36,7 +47,18 @@
             "durable" : true,
             "auto_delete" : false,
             "arguments" : {
-                "x-dead-letter-exchange" : ""
+                "x-dead-letter-exchange" : "",
+                "x-dead-letter-routing-key" : "default.XQ"
+            }
+        },
+        {
+            "name" : "default.DQ",
+            "vhost" : "/",
+            "durable" : true,
+            "auto_delete" : false,
+            "arguments" : {
+                "x-dead-letter-exchange" : "",
+                "x-dead-letter-routing-key" : "default.XQ"
             }
         }
     ]

@@ -5,6 +5,10 @@ variable "hyperv_host" {
     host  = string
     port  = number
     https = bool
+    disks_path = {
+      type = string
+      description = "Путь к папке для хранения дисков виртуалок"
+    }
   })
 }
 
@@ -37,7 +41,7 @@ variable "netmask" {
 
 variable "ssh_key" {
   type    = string
-  default = "/root/.ssh/id_rsa"
+  default = "/terraform/.ssh/id_rsa"
 }
 
 variable "base_ip" {

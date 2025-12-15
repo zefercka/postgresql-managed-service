@@ -12,7 +12,7 @@ terraform {
 }
 
 provider "vault" {
-  token = chomp(file(var.vault_token_file))
+  token = var.vault_token_file != "" ? chomp(file(var.vault_token_file)) : null
 }
 
 # Инициализация Vault хранилища для хостов
@@ -97,9 +97,9 @@ resource "null_resource" "create_nat" {
 resource "hyperv_vhd" "disk" {
   for_each = var.vms
 
-  path   = "D:\\VMS\\disks\\${each.key}.vhdx"
-  size   = each.value.disk_size * 1024 * 1024 * 1024     # 10GB
-  source = each.value.source_disk_path
+  path     = "${disks_path}\\${each.key}.vhdx"
+  size     = each.value.disk_size * 1024 * 1024 * 1024
+  source   = each.value.source_disk_path
 }
 
 # Виртуальная машина
@@ -109,7 +109,7 @@ resource "hyperv_machine_instance" "vm" {
   name                 = each.key
   generation           = 2
   processor_count      = each.value.cpu
-  memory_startup_bytes = each.value.memory * 1024 * 1024 # 2 GB
+  memory_startup_bytes = each.value.memory * 1024 * 1024
   static_memory        = true
   state                = "Running"
 

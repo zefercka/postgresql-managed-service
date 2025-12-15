@@ -93,6 +93,8 @@ class HypervHost(Base):
         DateTime(timezone=True),
     )
 
+    disks_path: Mapped[str] = mapped_column(String(260))
+
     status: Mapped[HypervHostStatus] = relationship("HypervHostStatus", lazy="selectin")
 
 

@@ -7,6 +7,7 @@ from app.src.schemas.hyperv_host import (
     HypervHost,
     HypervHostAudit,
     HypervHostResponse,
+    UpdateHypervHost,
 )
 
 from . import service
@@ -36,7 +37,7 @@ async def get_host(
 async def update_host(
     session: AsyncDbSession,
     current_user: CurrentUserAdmin,
-    host: CreateHypervHost,
+    host: UpdateHypervHost,
     host_id: int,
 ) -> HypervHost:
     host = await service.update_host(session, current_user, host, host_id)
@@ -73,3 +74,14 @@ async def get_host_audit(
     audit = await service.get_audit(session, current_user, host_id)
 
     return audit
+
+
+@app.get(
+    "/{host_id|/clusters}", summary="Получить список кластеров на HyperV хосте по ID"
+)
+async def get_host_clusters(
+    session: AsyncDbSession, current_user: CurrentUserAdmin, host_id: int
+) -> list[HypervHost]:
+    clusters = await service.get_host_clusters(session, current_user, host_id)
+
+    return clusters

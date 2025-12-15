@@ -124,6 +124,29 @@ class HypervHostRepository(BaseRepository[HypervHost]):
 
         return total
 
+    @staticmethod
+    async def find_clusters_on_host(
+        session: AsyncSession,
+        host_id: int,
+    ) -> list[Cluster]:
+        """Возвращает список кластеров, работающих на данном HyperV хосте
+
+        Args:
+            session (AsyncSession): Сессия БД
+            host_id (int): Идентификатор хоста
+
+        Returns:
+            list[Cluster]: Список кластеров
+        """
+        query = select(Cluster).where(
+            and_(Cluster.hyperv_host_id == host_id, Cluster.deleted_at == None)  # noqa: E711
+        )
+
+        result = await session.execute(query)
+        clusters = result.scalars().all()
+
+        return clusters
+
 
 class HypervHostAuditRepository(BaseRepository[HypervHostAudit]):
     model = HypervHostAudit

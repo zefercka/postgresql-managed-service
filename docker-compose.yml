@@ -1,13 +1,30 @@
 services:
+  migrations:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: migrations
+    container_name: ms-migrations
+    depends_on:
+      - postgres
+    env_file:
+      - "./.server.env"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    networks:
+      - managed_service_network
+
   server:
     build:
       context: .
       dockerfile: ./Dockerfile
-      target: final
+      target: server
     container_name: ms-server
     depends_on:
       - rabbitmq
       - postgres
+      - migrations
     env_file:
       - "./.server.env"
     environment:
@@ -70,8 +87,8 @@ services:
   terraform:
     build:
       context: .
-      dockerfile: ./terraform/Dockerfile
-      target: final
+      dockerfile: ./Dockerfile
+      target: terraform
     container_name: ms-terraform
     depends_on:
       - rabbitmq
@@ -87,11 +104,6 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN_FILE=/vault/token
     volumes:
-      - ./terraform/template/vm_template.tf:/opt/postgresql-managed-service/terraform/template/vm_template.tf
-      - ./terraform/template/variables.tf:/opt/postgresql-managed-service/terraform/template/variables.tf
-      - ./ansible/vm/change_vm_ip.yaml:/opt/postgresql-managed-service/ansible/vm/change_vm_ip.yaml
-      - ./ansible/vm/templates/01-netcfg.yaml.j2:/opt/postgresql-managed-service/ansible/vm/templates/01-netcfg.yaml.j2
-      - ./app:/opt/postgresql-managed-service/app
       - terraform_data:/opt/postgresql-managed-service/terraform
       - vault_token:/vault:ro
     networks:
@@ -100,7 +112,8 @@ services:
   vault:
     build:
       context: .
-      dockerfile: ./vault/Dockerfile
+      dockerfile: ./Dockerfile
+      target: vault
     container_name: ms-vault
     ports:
       - "8200:8200"

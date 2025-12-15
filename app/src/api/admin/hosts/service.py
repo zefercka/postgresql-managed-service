@@ -10,6 +10,7 @@ from app.src.schemas.hyperv_host import (
     HypervHost,
     HypervHostAudit,
     HypervHostResponse,
+    UpdateHypervHost,
 )
 
 from .exceptions import (
@@ -86,7 +87,7 @@ async def delete_host(session: AsyncSession, current_user: models.User, host_id:
 async def update_host(
     session: AsyncSession,
     current_user: models.User,
-    host: CreateHypervHost,
+    host: UpdateHypervHost,
     host_id: int,
 ) -> HypervHost:
     """Обновить HyperV хост по ID"""
@@ -166,3 +167,17 @@ async def get_audit(
     )
 
     return [HypervHostAudit.model_validate(log) for log in audit]
+
+
+async def get_host_clusters(
+    session: AsyncSession, current_user: models.User, host_id: int
+) -> list[HypervHost]:
+    """Возвращает список кластеров на HyperV хосте по ID"""
+
+    existed_host = await HypervHostRepository.find_one_or_none(session, id=host_id)
+    if existed_host is None:
+        raise NotFoundHostError
+
+    clusters = await HypervHostRepository.find_clusters_on_host(session, host_id)
+
+    return [HypervHost.model_validate(cluster) for cluster in clusters]

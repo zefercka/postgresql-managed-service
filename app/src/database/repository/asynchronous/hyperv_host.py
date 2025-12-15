@@ -86,14 +86,14 @@ class HypervHostRepository(BaseRepository[HypervHost]):
             select(HypervHost).order_by(HypervHost.id.asc()).limit(limit).offset(offset)
         )
         if not show_deleted:
-            query = query.where(HypervHost.deleted_at != None)
+            query = query.where(HypervHost.deleted_at == None)
 
         result = await session.execute(query)
         hosts = result.scalars().all()
 
         query = select(func.count(HypervHost.id))
         if not show_deleted:
-            query = query.where(HypervHost.deleted_at != None)
+            query = query.where(HypervHost.deleted_at == None)
 
         result = await session.execute(query)
         total = result.scalar_one()

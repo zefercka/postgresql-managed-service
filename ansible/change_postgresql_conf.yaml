@@ -5,3 +5,6 @@
 
   roles:
   - role: change_postgresql_conf
+    vars:
+      postgresql_version: "{{ postgresql_version }}"
+      config_params: {}

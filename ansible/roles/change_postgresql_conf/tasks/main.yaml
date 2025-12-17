@@ -1,4 +1,26 @@
-- name: Set max_connections
+- name: Set PostgreSQL config params
   community.postgresql.postgresql_alter_system:
-    param: max_connections
-    value: 50
+    param: "{{ item.key }}"
+    value: "{{ item.value }}"
+  loop: "{{ config_params | dict2items }}"
+  register: result
+
+- name: Restart PostgreSQL if required
+  become_user: root
+  service:
+    name: "postgresql@{{ postgresql_version }}-main"
+    state: restarted
+  when: result.results
+      | selectattr('restart_required', 'defined')
+      | selectattr('restart_required')
+      | list
+      | length > 0
+
+- name: Reload PostgreSQL config
+  community.postgresql.postgresql_query:
+    query: SELECT pg_reload_conf()
+  when: result.results
+      | selectattr('restart_required', 'defined')
+      | selectattr('restart_required')
+      | list
+      | length == 0

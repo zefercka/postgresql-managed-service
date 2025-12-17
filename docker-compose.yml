@@ -81,6 +81,15 @@ services:
       context: .
       dockerfile: ./ansible/Dockerfile
     container_name: ms-ansible
+    volumes:
+      - ./ansible:/opt/postgresql-managed-service/ansible
+    networks:
+      - managed_service_network
+  
+  void_container:
+    image: python:3.12-slim
+    entrypoint: tail -f /dev/null
+    container_name: ms-void_container
     networks:
       - managed_service_network
 

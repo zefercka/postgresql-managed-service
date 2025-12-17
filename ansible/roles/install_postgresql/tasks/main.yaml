@@ -1,0 +1,50 @@
+- name: Add PostgreSQL repo using deb822_repository
+  ansible.builtin.deb822_repository:
+    name: "postgresql"
+    types: [deb]
+    uris: ["http://apt.postgresql.org/pub/repos/apt"]
+    suites: ["{{ ansible_distribution_release }}-pgdg"]
+    components: ["main"]
+    signed_by: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+    state: present
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install PostgreSQL
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ postgresql_version }}"
+      - "postgresql-contrib-{{ postgresql_version }}"
+    state: present
+
+- name: Get PostgreSQL clusters
+  ansible.builtin.command: pg_lsclusters --no-header
+  register: pg_clusters
+  changed_when: false
+
+- name: Stop PostgreSQL clusters
+  ansible.builtin.service:
+    name: "postgresql@{{ item.split()[0] }}-{{ item.split()[1] }}"
+    state: stopped
+    enabled: no
+  loop: "{{ pg_clusters.stdout_lines }}"
+
+- name: Ensure PostgreSQL {{ postgresql_version }} cluster exists
+  ansible.builtin.command: >
+    pg_createcluster {{ postgresql_version }} main -p 5432
+  args:
+    creates: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+
+- name: Start PostgreSQL {{ postgresql_version }} cluster
+  ansible.builtin.service:
+    name: "postgresql@{{ postgresql_version }}-main"
+    state: started
+    enabled: yes
+
+- name: Install psycopg
+  ansible.builtin.apt:
+    name:
+      - python3-psycopg2
+    state: present

@@ -1,0 +1,16 @@
+- name: Backup existing netplan
+  copy:
+    src: /etc/netplan/01-netcfg.yaml
+    dest: /etc/netplan/01-netcfg.yaml.bak
+    remote_src: yes
+
+- name: Apply new netplan config
+  template:
+    src: 01-netcfg.yaml.j2
+    dest: /etc/netplan/01-netcfg.yaml
+    mode: 0644
+
+- name: Apply netplan
+  command: netplan apply
+  async: 5
+  poll: 0

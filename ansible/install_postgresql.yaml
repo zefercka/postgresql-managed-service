@@ -1,0 +1,8 @@
+- hosts: all
+  gather_facts: yes
+  become: yes
+
+  roles:
+  - role: install_postgresql
+    vars:
+      postgresql_version: "{{ postgresql_version }}"

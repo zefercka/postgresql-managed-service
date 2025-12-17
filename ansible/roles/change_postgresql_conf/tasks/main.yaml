@@ -1,0 +1,4 @@
+- name: Set max_connections
+  community.postgresql.postgresql_alter_system:
+    param: max_connections
+    value: 50

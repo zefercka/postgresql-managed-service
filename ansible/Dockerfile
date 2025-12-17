@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 
 # Установим SSH-сервер
-RUN apt update && apt install -y openssh-server sudo && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y openssh-server sudo ansible && \
+    rm -rf /var/lib/apt/lists/*
 
 # Создадим пользователя
 RUN useradd -m -s /bin/bash ansibleuser && \
@@ -14,12 +15,10 @@ RUN mkdir -p /home/ansibleuser/.ssh && \
 
 # Копируем твой публичный ключ внутрь контейнера
 # Предположим, твой публичный ключ находится рядом с Dockerfile как id_rsa.pub
-COPY keys/servers/ssh_key /home/ansibleuser/.ssh/authorized_keys
+COPY keys/servers/ssh_key /home/ansibleuser/.ssh/id_rsa
 
-RUN chown ansibleuser:ansibleuser /home/ansibleuser/.ssh/authorized_keys && \
-    chmod 600 /home/ansibleuser/.ssh/authorized_keys
+RUN chown ansibleuser:ansibleuser /home/ansibleuser/.ssh/id_rsa && chmod 600 /home/ansibleuser/.ssh/id_rsa
 
-# Разрешаем root логин по SSH (опционально)
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN eval $(ssh-agent) && ssh-add /home/ansibleuser/.ssh/id_rsa
 
 CMD ["tail", "-f", "/dev/null"]

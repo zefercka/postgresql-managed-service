@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.src.database.declarations.hyperv_hosts import HypervHostStatusEnum
+
 
 class BaseHypervHost(BaseModel):
     host_fqdn: str = Field(description="Адрес хоста")
@@ -48,6 +50,16 @@ class HypervHostStatus(BaseModel):
     id: int
     status: str
     description: Optional[str] = Field(default=None)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UpdateHypervHostStatus(BaseModel):
+    status_id: int = Field(
+        description="ID статуса хоста",
+        ge=HypervHostStatusEnum.ON_SERVICE,
+        le=HypervHostStatusEnum.DISABLED,
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

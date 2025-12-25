@@ -14,6 +14,8 @@ class Config(BaseSettings):
 
     REPOSITORY_TYPE: str = "async"
 
+    TELEGRAM_AUTH_ENABLED: bool = True
+
     TELEGRAM_BOT_TOKEN: str
     # Кеш токена генерируется автоматически после инициализации
     HASH_TELEGRAM_BOT_TOKEN: str = ""
@@ -34,11 +36,18 @@ class Config(BaseSettings):
     RABBITMQ_VHOST: str
 
     TERRAFORM_DIR: str
-    
+
     VM_SOURCE_DISK_PATH: str
 
     # Путь до приватного ключами для подключения по SSH к серверам
     SERVERS_KEY_PATH: str = "./keys/servers/ssh_key"
+
+    # HashiCorp Vault
+    VAULT_ADDR: str = "http://localhost:8200"
+    VAULT_TOKEN: str = ""
+    VAULT_NAMESPACE: str = ""
+
+    VAULT_CLUSTERS_SECRET_PATH: str = "secrets/clusters"
 
     model_config = SettingsConfigDict(
         env_file=".server.env",

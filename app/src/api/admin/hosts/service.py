@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from app.src.database import models
+from app.src.database.declarations.hyperv_hosts import HypervHostStatusEnum
 from app.src.database.repository import HypervHostAuditRepository, HypervHostRepository
 from app.src.dependency import helpers
 from app.src.schemas.hyperv_host import (
@@ -11,6 +12,7 @@ from app.src.schemas.hyperv_host import (
     HypervHostAudit,
     HypervHostResponse,
     UpdateHypervHost,
+    UpdateHypervHostStatus,
 )
 
 from .exceptions import (
@@ -74,7 +76,10 @@ async def delete_host(session: AsyncSession, current_user: models.User, host_id:
         raise HostCantBeDeletedError
 
     await HypervHostRepository.update(
-        session, host_id, deleted_at=datetime.now(timezone.utc)
+        session,
+        host_id,
+        status_id=HypervHostStatusEnum.DELETED,
+        deleted_at=datetime.now(timezone.utc),
     )
     await HypervHostAuditRepository.add(
         session,
@@ -181,3 +186,39 @@ async def get_host_clusters(
     clusters = await HypervHostRepository.find_clusters_on_host(session, host_id)
 
     return [HypervHost.model_validate(cluster) for cluster in clusters]
+
+
+async def update_host_status(
+    session: AsyncSession,
+    current_user: models.User,
+    status: UpdateHypervHostStatus,
+    host_id: int,
+) -> HypervHost:
+    """Изменить статус HyperV хоста по ID"""
+
+    existed_host = await HypervHostRepository.find_one_or_none(session, id=host_id)
+    if existed_host is None:
+        raise NotFoundHostError
+
+    if existed_host.deleted_at is not None:
+        raise HostCantBeChangedError
+
+    old_status = existed_host.status_id
+
+    existed_host = await HypervHostRepository.update_status(
+        session,
+        host_id,
+        status.status_id,
+    )
+
+    await HypervHostAuditRepository.add(
+        session,
+        user_id=current_user.id,
+        hyperv_host_id=host_id,
+        log=(
+            f"Статус сервера изменён с {HypervHostStatusEnum(old_status).name} "
+            f"на {HypervHostStatusEnum(status.status_id).name}"
+        ),
+    )
+
+    return HypervHost.model_validate(existed_host)

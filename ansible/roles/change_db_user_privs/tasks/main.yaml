@@ -1,0 +1,7 @@
+- name: change_db_user_privs
+  community.postgresql.postgresql_privs:
+    login_db: "{{ db_name }}"
+    state: "{{ grant }}"
+    type: database
+    priv: "{{ privs }}"
+    role: "{{ user_names }}"

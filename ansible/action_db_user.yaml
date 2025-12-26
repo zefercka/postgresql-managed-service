@@ -1,0 +1,19 @@
+- hosts: all
+  gather_facts: yes
+  become: yes
+  become_user: postgres
+
+  roles:
+  - role: action_db_user
+    vars:
+      user_name: "{{ user_name }}"
+      password: "{{ password }}"
+      pg_role_attrs: "LOGIN"
+  - role: change_db_user_privs
+    when: present == 'present'
+    vars:
+      db_name: "{{ db_name }}"
+      grant: "{{ grant }}"
+      privs: "{{ privs }}"
+      user_names: "{{ user_name }}"
+

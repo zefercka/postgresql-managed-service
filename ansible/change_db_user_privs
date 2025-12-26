@@ -1,0 +1,12 @@
+- hosts: all
+  gather_facts: yes
+  become: yes
+  become_user: postgres
+
+  roles:
+  - role: change_db_user_privs
+    vars:
+      db_name: "{{ db_name }}"
+      grant: "{{ grant }}"
+      privs: "{{ privs }}"
+      user_names: "{{ user_names }}"

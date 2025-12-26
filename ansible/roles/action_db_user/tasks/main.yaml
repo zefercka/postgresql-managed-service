@@ -1,0 +1,6 @@
+- name: Create PostgreSQL user
+  community.postgresql.postgresql_user:
+    name: "{{ user_name }}"
+    password: "{{ password }}"
+    role_attr_flags: "{{ pg_role_attrs }}"
+    state: "{{ present }}"

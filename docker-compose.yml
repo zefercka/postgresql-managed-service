@@ -22,9 +22,14 @@ services:
       target: server
     container_name: ms-server
     depends_on:
-      - rabbitmq
-      - postgres
-      - migrations
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_started
+      vault:
+        condition: service_healthy
+      migrations:
+        condition: service_started
     env_file:
       - "./.server.env"
     environment:
@@ -32,10 +37,12 @@ services:
       - RABBITMQ_PORT=5672
       - DB_HOST=postgres
       - DB_PORT=5432
+      - VAULT_ADDR=http://vault:8200
     ports:
       - "8000:8000"
     volumes:
       - ./app:/opt/postgresql-managed-service/app
+      - vault_approle:/vault/approle:ro
     networks:
       - managed_service_network
 
@@ -85,13 +92,6 @@ services:
       - ./ansible:/opt/postgresql-managed-service/ansible
     networks:
       - managed_service_network
-  
-  void_container:
-    image: python:3.12-slim
-    entrypoint: tail -f /dev/null
-    container_name: ms-void_container
-    networks:
-      - managed_service_network
 
   terraform:
     build:
@@ -100,9 +100,12 @@ services:
       target: terraform
     container_name: ms-terraform
     depends_on:
-      - rabbitmq
-      - postgres
-      - vault
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_started
+      vault:
+        condition: service_healthy
     env_file:
       - "./.server.env"
     environment:
@@ -111,10 +114,11 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - VAULT_ADDR=http://vault:8200
-      - VAULT_TOKEN_FILE=/vault/token
+      - VAULT_ROLE_ID_FILE=/vault/approle/terraform-role-id
+      - VAULT_SECRET_ID_FILE=/vault/approle/terraform-secret-id
     volumes:
       - terraform_data:/opt/postgresql-managed-service/terraform
-      - vault_token:/vault:ro
+      - vault_approle:/vault/approle:ro
     networks:
       - managed_service_network
 
@@ -125,7 +129,7 @@ services:
       target: vault
     container_name: ms-vault
     ports:
-      - "8200:8200"
+      - "18200:8200"
     environment:
       - VAULT_ADDR=http://127.0.0.1:8200
     cap_add:
@@ -135,12 +139,13 @@ services:
       - vault_config:/vault/config
       - vault_init:/vault/init
       - vault_logs:/vault/logs
-      - vault_token:/vault:rw
+      - vault_token:/vault/token-storage:rw
+      - vault_approle:/vault/approle:rw
     healthcheck:
-      test: ["CMD", "vault", "status"]
-      interval: 15s
+      test: ["CMD", "sh", "-c", "vault status | grep -q 'Sealed.*false'"]
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 30s
     restart: unless-stopped
     networks:
@@ -155,6 +160,7 @@ volumes:
   vault_token:     # Токены для межсервисного взаимодействия
   vault_init:      # Unseal ключи и root token
   vault_logs:      # Audit логи
+  vault_approle:   # AppRole credentials для сервисов
 
 networks:
   managed_service_network:

@@ -1,3 +1,9 @@
+- name: Install debian
+  ansible.builtin.apt:
+    name:
+      - python3-debian
+    state: present
+
 - name: Add PostgreSQL repo using deb822_repository
   ansible.builtin.deb822_repository:
     name: "postgresql"
@@ -48,3 +54,31 @@
     name:
       - python3-psycopg2
     state: present
+
+- name: Install ACL
+  ansible.builtin.apt:
+    name:
+      - acl
+    state: present
+
+- name: Create application database
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: "{{ db_name }}"
+    state: present
+
+- name: Create app user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_pass }}"
+    role_attr_flags: "SUPERUSER,LOGIN"
+
+- name: Disable postgres login
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: postgres
+    role_attr_flags: "NOLOGIN"

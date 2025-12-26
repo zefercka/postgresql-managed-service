@@ -1,3 +1,6 @@
+- name: install backups
+  import_tasks: install_backups.yaml
+
 - name: Install debian
   ansible.builtin.apt:
     name:
@@ -82,3 +85,6 @@
   community.postgresql.postgresql_user:
     name: postgres
     role_attr_flags: "NOLOGIN"
+
+- name: install backups
+  import_tasks: install_backups.yaml

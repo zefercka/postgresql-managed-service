@@ -23,6 +23,17 @@ class BaseHypervHost(BaseModel):
 class CreateHypervHost(BaseHypervHost):
     disks_path: str = Field(description="Путь для хранения дисков ВМ")
 
+    username: str = Field(
+        min_length=4,
+        max_length=64,
+        description="Имя пользователя для подключения к Hyper-V хосту",
+    )
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+        description="Пароль пользователя для подключения к Hyper-V хосту",
+    )
+
     @field_validator("disks_path")
     @classmethod
     def validate_disks_path(cls, v: str) -> str:

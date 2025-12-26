@@ -1,7 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.database import models
-from app.src.database.declarations.cluster import ClusterStatusEnum
 from app.src.database.repository import (
     ClusterRepository,
     HypervHostRepository,

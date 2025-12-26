@@ -1,29 +1,27 @@
 # Политика доступа для Terraform сервиса
 # Предоставляет минимально необходимые права (Principle of Least Privilege)
 
-# Доступ к секретам Hyper-V
-path "secret/data/hyperv/*" {
+# Доступ к секретам Hyper-V хостов
+path "hyperv_hosts/data/*" {
   capabilities = ["read", "list"]
 }
 
-# Доступ к секретам PostgreSQL
-path "secret/data/postgresql/*" {
-  capabilities = ["read", "list"]
+path "hyperv_hosts/metadata/*" {
+  capabilities = ["list", "read"]
 }
 
-# Доступ к SSH ключам
-path "secret/data/ssh/*" {
-  capabilities = ["read", "list"]
+# Доступ к секретам PostgreSQL кластеров (только чтение для Terraform)
+path "clusters/data/*" {
+  capabilities = ["create", "read", "update", "list"]
 }
 
-# Доступ к секретам конфигурации
-path "secret/data/config/*" {
-  capabilities = ["read", "list"]
+path "clusters/metadata/*" {
+  capabilities = ["create", "list", "read", "update"]
 }
 
-# Доступ к метаданным секретов
-path "secret/metadata/*" {
-  capabilities = ["list"]
+# Возможность создания дочернего токена (требуется для Terraform provider)
+path "auth/token/create" {
+  capabilities = ["create", "update"]
 }
 
 # Возможность обновления своего токена

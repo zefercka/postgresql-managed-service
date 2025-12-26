@@ -2,9 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.load_vault_approle import load_approle_credentials
 from app.src.api.admin import app as admin_controller
 from app.src.api.auth.controller import app as auth_controller
 from app.src.api.clusters.controller import app as clusters_controller
+
+load_approle_credentials()
 
 app = FastAPI()
 

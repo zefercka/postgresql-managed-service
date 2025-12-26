@@ -90,7 +90,7 @@ class Cluster(BaseCluster, DBNameValidator):
             ]
         ):
             self.connection_string = (
-                f"{self.username}@{self.host_fqdn}:{self.postgres_port}/{self.name}"
+                f"{self.username}@{self.host_fqdn}:{self.postgres_port}/{self.db_name}"
             )
 
         return self

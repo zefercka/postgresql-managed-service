@@ -46,6 +46,10 @@ class Config(BaseSettings):
     VAULT_ADDR: str = "http://localhost:8200"
     VAULT_TOKEN: str = ""
     VAULT_NAMESPACE: str = ""
+    
+    # AppRole authentication (альтернатива токену)
+    VAULT_ROLE_ID: str = ""
+    VAULT_SECRET_ID: str = ""
 
     VAULT_CLUSTERS_SECRET_PATH: str = "secrets/clusters"
 

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 from app.src.database import models
 from app.src.database.declarations.hyperv_hosts import HypervHostStatusEnum
 from app.src.database.repository import HypervHostAuditRepository, HypervHostRepository
-from app.src.dependency import helpers
+from app.src.dependency import helpers, vault
 from app.src.schemas.hyperv_host import (
     CreateHypervHost,
     HypervHost,
@@ -19,6 +19,7 @@ from .exceptions import (
     HostAlreadyExistsError,
     HostCantBeChangedError,
     HostCantBeDeletedError,
+    HostCredentialsSaveError,
     NotFoundHostError,
 )
 
@@ -39,6 +40,9 @@ async def create_host(
     data["free_ram"] = data["total_ram"]
     data["free_cpu"] = data["total_cpu"]
 
+    username = data.pop("username")
+    password = data.pop("password")
+
     new_host = await HypervHostRepository.add(session, **data)
     await HypervHostAuditRepository.add(
         session,
@@ -46,6 +50,19 @@ async def create_host(
         hyperv_host_id=new_host.id,
         log="HyperV хост создан",
     )
+
+    host_id = new_host.id
+
+    client = vault.get_vault_client()
+
+    status = client.write_secret(
+        path=f"{host_id}",
+        secret={"username": username, "password": password},
+        mount_point="hyperv_hosts",
+    )
+
+    if status is False:
+        raise HostCredentialsSaveError
 
     return HypervHost.model_validate(new_host)
 

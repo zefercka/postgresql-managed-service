@@ -44,13 +44,35 @@ USER app
 
 CMD ["uvicorn", "app.main:app", "--host=0.0.0.0"]
 
-FROM python-deps-install AS ansible-prebuild
+FROM python-deps-install AS ansible
 
 RUN apt-get update && \
-    apt-get install -y sudo && \
+    apt-get install -y sudo ansible openssh-server && \
     rm -rf /var/lib/apt/lists/*
 
-# TODO когда Иван запушит плейбук дописать
+RUN useradd -m -s /bin/bash ansibleuser && \
+    echo 'ansibleuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Создадим папку для SSH
+RUN mkdir -p /home/ansibleuser/.ssh && \
+    chown ansibleuser:ansibleuser /home/ansibleuser/.ssh && \
+    chmod 700 /home/ansibleuser/.ssh
+
+COPY ./keys/servers/ssh_key /home/ansibleuser/.ssh/id_rsa
+
+COPY ./app/config.py /opt/postgresql-managed-service/app/config.py
+COPY ./app/run_dramatiq.py /opt/postgresql-managed-service/app/run_dramatiq.py
+COPY ./app/load_vault_approle.py /opt/postgresql-managed-service/app/load_vault_approle.py
+COPY ./app/src/database /opt/postgresql-managed-service/app/src/database
+COPY ./app/src/tasks /opt/postgresql-managed-service/app/src/tasks
+COPY ./app/src/dependency/helpers.py /opt/postgresql-managed-service/app/src/dependency/helpers.py
+COPY ./app/src/dependency/vault.py /opt/postgresql-managed-service/app/src/dependency/vault.py
+
+RUN chown ansibleuser:ansibleuser /home/ansibleuser/.ssh/id_rsa && chmod 600 /home/ansibleuser/.ssh/id_rsa
+
+RUN eval $(ssh-agent) && ssh-add /home/ansibleuser/.ssh/id_rsa
+
+CMD ["python", "/opt/postgresql-managed-service/app/run_dramatiq.py", "app.src.tasks.create_cluster_user_task", "--queues", "ansible_queue", "--threads", "8"]
 
 FROM python-deps-install AS terraform
 

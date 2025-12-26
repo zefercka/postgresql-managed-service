@@ -12,7 +12,15 @@ terraform {
 }
 
 provider "vault" {
-  token = var.vault_token_file != "" ? chomp(file(var.vault_token_file)) : null
+  # Используем AppRole для аутентификации вместо токена
+  auth_login {
+    path = "auth/approle/login"
+
+    parameters = {
+      role_id   = chomp(file(var.vault_role_id_file))
+      secret_id = chomp(file(var.vault_secret_id_file))
+    }
+  }
 }
 
 # Инициализация Vault хранилища для хостов
@@ -21,9 +29,26 @@ data "vault_kv_secret_v2" "host" {
   name  = var.hyperv_host.id
 }
 
+data "vault_kv_secret_v2" "cluster" {
+  for_each = var.vms
+
+  mount = "clusters"
+  name  = "${each.key}/users/super"
+}
+
 locals {
-  hyperv_host_user = data.vault_kv_secret_v2.host.data["user"]
+  hyperv_host_user = data.vault_kv_secret_v2.host.data["username"]
   hyperv_host_pass = data.vault_kv_secret_v2.host.data["password"]
+
+  postgres_super_user = {
+    for cluster, _ in var.vms :
+    cluster => data.vault_kv_secret_v2.cluster[cluster].data["username"]
+  }
+
+  postgres_super_pass = {
+    for cluster, _ in var.vms :
+    cluster => data.vault_kv_secret_v2.cluster[cluster].data["password"]
+  }
 }
 
 # Инициализация провайдера для создания ВМ
@@ -35,13 +60,6 @@ provider "hyperv" {
   user     = local.hyperv_host_user
   password = local.hyperv_host_pass
   timeout  = "200s"
-}
-
-# Ресурс для ожидания после создания диска, потому что может упасть ошибка
-# что файл ещё занят
-resource "time_sleep" "wait_after_create_disk" {
-  create_duration = "20s"
-  depends_on      = [hyperv_vhd.disk]
 }
 
 # Сетевой свитч
@@ -66,9 +84,14 @@ resource "null_resource" "set_internal_switch_ip" {
     insecure = true
   }
 
+  provisioner "file" {
+    source      = "../scripts/set_switch_ip.ps1"
+    destination = "C:/Temp/set_switch_ip.ps1"
+  }
+
   provisioner "remote-exec" {
     inline = [
-      "powershell -Command \"Start-Sleep -Seconds 5; $ifAlias = 'vEthernet (DMZ)'; if (-not (Get-NetIPAddress -InterfaceAlias $ifAlias -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -eq '192.168.100.1' })) { Remove-NetIPAddress -InterfaceAlias $ifAlias -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -IPAddress 192.168.100.1 -PrefixLength 24 -InterfaceAlias $ifAlias }\"",
+      "powershell -ExecutionPolicy Bypass -File C:/Temp/set_switch_ip.ps1",
     ]
   }
 }
@@ -86,9 +109,14 @@ resource "null_resource" "create_nat" {
     insecure = true
   }
 
+  provisioner "file" {
+    source      = "../scripts/create_nat.ps1"
+    destination = "C:/Temp/create_nat.ps1"
+  }
+
   provisioner "remote-exec" {
     inline = [
-      "powershell -Command \"if (-not (Get-NetNat -Name 'InternalNatNetwork' -ErrorAction SilentlyContinue)) { New-NetNat -Name 'InternalNatNetwork' -InternalIPInterfaceAddressPrefix '192.168.100.0/24' }\""
+      "powershell -ExecutionPolicy Bypass -File C:/Temp/create_nat.ps1 -NatName 'InternalNatNetwork' -InternalIPInterfaceAddressPrefix '192.168.100.0/24'"
     ]
   }
 }
@@ -97,9 +125,16 @@ resource "null_resource" "create_nat" {
 resource "hyperv_vhd" "disk" {
   for_each = var.vms
 
-  path     = "${disks_path}\\${each.key}.vhdx"
+  path     = "${var.hyperv_host.disks_path}\\${each.key}.vhdx"
   size     = each.value.disk_size * 1024 * 1024 * 1024
   source   = each.value.source_disk_path
+}
+
+# Ресурс для ожидания после создания диска, потому что может упасть ошибка
+# что файл ещё занят
+resource "time_sleep" "wait_after_create_disk" {
+  create_duration = "20s"
+  depends_on      = [hyperv_vhd.disk]
 }
 
 # Виртуальная машина
@@ -119,6 +154,12 @@ resource "hyperv_machine_instance" "vm" {
     hyperv_network_switch.dmz,
     null_resource.create_nat,
   ]
+
+  lifecycle {
+    ignore_changes = [
+      vm_firmware[0].boot_order
+    ]
+  }
 
   # Диск
   hard_disk_drives {
@@ -164,24 +205,6 @@ resource "hyperv_machine_instance" "vm" {
 resource "null_resource" "hyperv_nat_port22" {
   depends_on = [ hyperv_machine_instance.vm ]
 
-  provisioner "remote-exec" {
-    connection {
-      type     = "winrm"
-      host     = var.hyperv_host.host
-      user     = local.hyperv_host_user
-      password = local.hyperv_host_pass
-      https    = var.hyperv_host.https
-      insecure = true
-    }
-
-    inline = [
-      "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$natName = 'InternalNatNetwork'; $internalIP = '${var.base_ip}'; $port = 22; $exists = Get-NetNatStaticMapping -NatName $natName -ErrorAction SilentlyContinue | Where-Object { $_.ExternalPort -eq $port -and $_.Protocol -eq 'TCP' }; if ($exists) { Write-Host 'Port forwarding already exists. Skipping.' } else { Write-Host 'Creating NAT port forward for port', $port, '...'; Add-NetNatStaticMapping -NatName $natName -Protocol TCP -ExternalIPAddress '0.0.0.0' -ExternalPort $port -InternalIPAddress $internalIP -InternalPort $port; Write-Host 'Port forward created.' }\""
-    ]
-  }
-}
-
-# Поиск свободных IP в NAT сети
-resource "null_resource" "find_free_ip_remote" {
   connection {
     type     = "winrm"
     host     = var.hyperv_host.host
@@ -191,34 +214,88 @@ resource "null_resource" "find_free_ip_remote" {
     insecure = true
   }
 
+  provisioner "file" {
+    source      = "../scripts/add_initial_port_mapping.ps1"
+    destination = "C:/Temp/add_initial_port_mapping.ps1"
+  }
+
   provisioner "remote-exec" {
     inline = [
-      "powershell -Command \"if (!(Test-Path -Path 'C:\\Temp' -PathType Container)) { New-Item -ItemType Directory -Path 'C:\\Temp' -Force }\"",
-      "powershell -Command \"$candidate_ips = 20..254 | ForEach-Object { '192.168.100.' + $_ }; foreach ($ip in $candidate_ips) { if (-not (Test-Connection -ComputerName $ip -Count 1 -Quiet)) { Set-Content -Path 'C:\\Temp\\free_ip.txt' -Value $ip; break } }\""
+      "powershell -ExecutionPolicy Bypass -File C:/Temp/add_initial_port_mapping.ps1 -InternalIP ${var.base_ip}"
+    ]
+  }
+}
+
+# Поиск свободных IP в NAT сети с механизмом блокировки (для каждой ВМ отдельно)
+resource "null_resource" "find_free_ip_remote" {
+  for_each = var.vms
+
+  connection {
+    type     = "winrm"
+    host     = var.hyperv_host.host
+    user     = local.hyperv_host_user
+    password = local.hyperv_host_pass
+    https    = var.hyperv_host.https
+    insecure = true
+  }
+
+  provisioner "file" {
+    source      = "../scripts/find_free_ip.ps1"
+    destination = "C:/Temp/find_free_ip_${each.key}.ps1"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "powershell -ExecutionPolicy Bypass -File C:/Temp/find_free_ip_${each.key}.ps1 -OutputFile C:/Temp/free_ip_${each.key}.txt"
     ]
   }
 
   provisioner "local-exec" {
-    command = "scp -o StrictHostKeyChecking=no ${local.hyperv_host_user}@${var.hyperv_host.host}:C:/Temp/free_ip.txt ./local_free_ip.txt"
+    command = "sshpass -p '${local.hyperv_host_pass}' scp -o StrictHostKeyChecking=no ${local.hyperv_host_user}@${var.hyperv_host.host}:C:/Temp/free_ip_${each.key}.txt ./local_free_ip_${each.key}.txt"
   }
 }
 
 data "local_file" "free_ip" {
-  depends_on = [ null_resource.find_free_ip_remote ]
+  for_each = var.vms
+  depends_on = [null_resource.find_free_ip_remote]
 
-  filename = "./local_free_ip.txt"
+  filename = "./local_free_ip_${each.key}.txt"
 }
 
-# Установка найденного IP в виртуалку (тут возможно надо доработать как-то, сейчас получается
-# что IP только для последней виртуалки, но в целом так и должо быть)
+# Установка найденного IP в виртуалку
 resource "null_resource" "set_vm_ip" {
   depends_on = [hyperv_machine_instance.vm, data.local_file.free_ip, null_resource.hyperv_nat_port22]
+
+  for_each = var.vms
 
   provisioner "local-exec" {
     environment = {
       ANSIBLE_HOST_KEY_CHECKING = "False"
     }
-    command = "ansible-playbook ../../ansible/vm/change_vm_ip.yaml -e new_ip=${trimspace(data.local_file.free_ip.content)} -e netmask=${var.netmask} -e gateway=${var.gateway} -e ansible_user=automation -i ${var.hyperv_host.host}, -e ansible_port=${var.proxied_ssh_port} --private-key=${var.ssh_key}"
+    command = "ansible-playbook ../../ansible/change_vm_ip.yaml -e new_ip=${trimspace(data.local_file.free_ip[each.key].content)} -e netmask=${var.netmask} -e gateway=${var.gateway} -e ansible_user=automation -i ${var.hyperv_host.host}, -e ansible_port=${var.proxied_ssh_port} --private-key=${var.ssh_key}"
+  }
+
+  # Освобождаем блокировку IP после успешного назначения
+  connection {
+    type     = "winrm"
+    host     = var.hyperv_host.host
+    user     = local.hyperv_host_user
+    password = local.hyperv_host_pass
+    https    = var.hyperv_host.https
+    insecure = true
+  }
+
+  provisioner "file" {
+    source      = "../scripts/unlock_ip.ps1"
+    destination = "C:/Temp/unlock_ip_${each.key}.ps1"
+  }
+
+
+  provisioner "remote-exec" {
+    when = create
+    inline = [
+      "powershell -ExecutionPolicy Bypass -File C:/Temp/unlock_ip_${each.key}.ps1 -IPAddress ${trimspace(data.local_file.free_ip[each.key].content)}"
+    ]
   }
 }
 
@@ -226,51 +303,95 @@ resource "null_resource" "set_vm_ip" {
 resource "null_resource" "port_forward_new_ip" {
   depends_on = [null_resource.set_vm_ip]
 
-  provisioner "remote-exec" {
-    connection {
-      type     = "winrm"
-      host     = var.hyperv_host.host
-      user     = local.hyperv_host_user
-      password = local.hyperv_host_pass
-      https    = var.hyperv_host.https
-      insecure = true
-    }
+  for_each = var.vms
 
+  connection {
+    type     = "winrm"
+    host     = var.hyperv_host.host
+    user     = local.hyperv_host_user
+    password = local.hyperv_host_pass
+    https    = var.hyperv_host.https
+    insecure = true
+  }
+
+  provisioner "file" {
+    source      = "../scripts/add_nat_port_mapping.ps1"
+    destination = "C:/Temp/add_nat_port_mapping_${each.key}.ps1"
+  }
+
+  provisioner "remote-exec" {
     inline = [
-       "powershell -Command \"& { $natName = 'InternalNatNetwork'; $startPort = 20000; $sshInternalIP = '${trimspace(data.local_file.free_ip.content)}'; $pgInternalIP = '${trimspace(data.local_file.free_ip.content)}'; function Find-FreePort { param([int]$Start); for ($p = $Start; $p -le 65535; $p++) { if (-not (Test-NetConnection -ComputerName 127.0.0.1 -Port $p -WarningAction SilentlyContinue).TcpTestSucceeded) { if (-not (Get-NetNatStaticMapping -NatName $natName -ErrorAction SilentlyContinue | Where-Object { $_.ExternalPort -eq $p })) { return $p } } } throw 'Нет свободных портов.' }; $sshPort = Find-FreePort -Start $startPort; $pgPort = Find-FreePort -Start ($sshPort + 1); Write-Host \\\"Найден свободный порт для SSH: $sshPort\\\"; Write-Host \\\"Найден свободный порт для PostgreSQL: $pgPort\\\"; Add-NetNatStaticMapping -NatName $natName -Protocol TCP -ExternalIPAddress 0.0.0.0 -ExternalPort $sshPort -InternalIPAddress $sshInternalIP -InternalPort 22; Add-NetNatStaticMapping -NatName $natName -Protocol TCP -ExternalIPAddress 0.0.0.0 -ExternalPort $pgPort -InternalIPAddress $pgInternalIP -InternalPort 5432; Set-Content -Path 'C:\\Temp\\nat_ports.txt' -Value \\\"SSH=$sshPort;PG=$pgPort\\\" }\""
+      "powershell -ExecutionPolicy Bypass -File C:/Temp/add_nat_port_mapping_${each.key}.ps1 -InternalIP ${trimspace(data.local_file.free_ip[each.key].content)} -OutputFile C:/Temp/nat_ports_${each.key}.txt"
     ]
   }
 
   provisioner "local-exec" {
-    command = "scp -o StrictHostKeyChecking=no ${local.hyperv_host_user}@${var.hyperv_host.host}:C:/Temp/nat_ports.txt ./local_free_ports.txt"
+    command = "sshpass -p '${local.hyperv_host_pass}' scp -o StrictHostKeyChecking=no ${local.hyperv_host_user}@${var.hyperv_host.host}:C:/Temp/nat_ports_${each.key}.txt ./local_free_ports_${each.key}.txt"
   }
 }
 
 data "local_file" "free_ports" {
-  depends_on = [ null_resource.port_forward_new_ip ]
-  filename = "./local_free_ports.txt"
+  for_each = var.vms
+  depends_on = [null_resource.port_forward_new_ip]
+  filename   = "./local_free_ports_${each.key}.txt"
 }
 
 locals {
-  raw_content = chomp(data.local_file.free_ports.content)
-  pairs       = split(";", local.raw_content)
-  port_map    = {
-    for pair in local.pairs : 
-    split("=", pair)[0] => tonumber(split("=", pair)[1])
+  vm_configs = {
+    for vm_name, vm in var.vms : vm_name => {
+      raw_content = chomp(data.local_file.free_ports[vm_name].content)
+      pairs       = split(";", chomp(data.local_file.free_ports[vm_name].content))
+      port_map    = {
+        for pair in split(";", chomp(data.local_file.free_ports[vm_name].content)) : 
+        split("=", pair)[0] => tonumber(split("=", pair)[1])
+      }
+    }
+  }
+}
+
+# Устанавливает PostgreSQL
+resource "null_resource" "install_postgres" {
+  depends_on = [data.local_file.free_ports]
+
+  for_each = var.vms
+
+  provisioner "local-exec" {
+    environment = {
+      ANSIBLE_HOST_KEY_CHECKING = "False"
+    }
+
+    command = "ansible-playbook ../../ansible/install_postgresql.yaml -e postgresql_version=${each.value.pg_version} -e ansible_user=automation -e db_name='${each.value.db_name}' -e db_user='${local.postgres_super_user[each.key]}' -e db_pass='${local.postgres_super_pass[each.key]}' -i ${var.hyperv_host.host}, -e ansible_port=${local.vm_configs[each.key].port_map["SSH"]} --private-key=${var.ssh_key}"
+  }
+}
+
+output "vm_configs" {
+  description = "Конфигурация всех созданных виртуальных машин"
+  value = {
+    for vm_name in keys(var.vms) : vm_name => {
+      ip           = trimspace(data.local_file.free_ip[vm_name].content)
+      ssh_port     = local.vm_configs[vm_name].port_map["SSH"]
+      postgres_port = local.vm_configs[vm_name].port_map["PG"]
+    }
   }
 }
 
 output "vm_ip" {
-  description = "Новый IP виртуальной машины"
-  value       = trimspace(data.local_file.free_ip.content)
+  description = "Новые IP виртуальных машин"
+  value       = {
+    for vm_name in keys(var.vms) : vm_name => trimspace(data.local_file.free_ip[vm_name].content)
+  }
 }
 
 output "ssh_port" {
-  description = "Внешний SSH порт, проброшенный NAT"
-  value       = local.port_map["SSH"]
+  description = "Внешние SSH порты, проброшенные NAT"
+  value       = {
+    for vm_name in keys(var.vms) : vm_name => local.vm_configs[vm_name].port_map["SSH"]
+  }
 }
 
 output "postgres_port" {
-  description = "Внешний PostgreSQL порт, проброшенный NAT"
-  value       = local.port_map["PG"]
+  description = "Внешние PostgreSQL порты, проброшенные NAT"
+  value       = {
+    for vm_name in keys(var.vms) : vm_name => local.vm_configs[vm_name].port_map["PG"]
+  }
 }

@@ -57,6 +57,8 @@ class Config(BaseSettings):
 
     VAULT_CLUSTERS_SECRET_PATH: str = "secrets/clusters"
 
+    ANSIBLE_SSH_PRIVATE_KEY_PATH: str = "./keys/ansible/ssh_key"
+
     model_config = SettingsConfigDict(
         env_file=".server.env",
     )

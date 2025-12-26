@@ -189,3 +189,20 @@ class HypervHostRepository(BaseRepository[HypervHost]):
 
 class HypervHostAuditRepository(BaseRepository[HypervHostAudit]):
     model = HypervHostAudit
+
+    @staticmethod
+    async def find_all(
+        session: AsyncSession, limit: int = 50, offset: int = 0, **filter
+    ) -> HypervHostAudit:
+        query = (
+            select(HypervHostAudit)
+            .limit(limit)
+            .offset(offset)
+            .order_by(HypervHostAudit.created_at.desc())
+        )
+
+        if filter:
+            query = query.filter_by(**filter)
+
+        result = await session.execute(query)
+        return result.scalars().all()

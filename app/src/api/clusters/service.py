@@ -37,7 +37,7 @@ async def create_cluster(
         raise InvalidVersionError
 
     data = cluster.model_dump()
-    data["id"] = helpers.generate_cluster_id()
+    data["id"] = helpers.generate_uuid_id()
     data["owner_id"] = current_user.id
 
     host = await HypervHostRepository.find_host_with_resources(

@@ -20,6 +20,9 @@ from app.src.database.models import (
     HypervHostStatus,
     PostgresVersion,
     User,
+    ClusterUser,
+    ClusterUserAudit,
+    ClusterUserStatus,
 )
 
 # this is the Alembic Config object, which provides

@@ -88,8 +88,27 @@ services:
   ansible:
     build:
       context: .
-      dockerfile: ./ansible/Dockerfile
+      dockerfile: ./Dockerfile
+      target: ansible
     container_name: ms-ansible
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_started
+      vault:
+        condition: service_healthy
+    env_file:
+      - "./.server.env"
+    environment:
+      - ANSIBLE_SSH_PRIVATE_KEY_PATH=/home/ansibleuser/.ssh/id_rsa
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_ROLE_ID_FILE=/vault/approle/server-role-id
+      - VAULT_SECRET_ID_FILE=/vault/approle/server-secret-id
     volumes:
       - ./ansible:/opt/postgresql-managed-service/ansible
     networks:

@@ -1,11 +1,11 @@
 import json
 import logging
-import os
 import shutil
 import subprocess
 from typing import Any
 
 import dramatiq
+from filelock import FileLock
 
 from app.config import settings
 from app.src.database import get_db
@@ -14,6 +14,7 @@ from app.src.database.repository.synchronous import (
     ClusterRepository,
     HypervHostRepository,
 )
+from app.src.dependency import helpers, vault
 
 from .worker import rabbitmq_broker  # noqa: F401
 
@@ -27,110 +28,115 @@ def create_vm_task(cluster_id: str):
     """
     Задача создания новой виртуальной машины
     """
+    try:
+        with get_db() as session:
+            cluster = ClusterRepository.find_one_or_none(session, id=cluster_id)
+            if not cluster:
+                raise ValueError(f"Cluster {cluster_id} not found")
 
-    with get_db() as session:
-        cluster = ClusterRepository.find_one_or_none(session, id=cluster_id)
-        host = HypervHostRepository.find_one_or_none(session, id=cluster.hyperv_host_id)
+            host = HypervHostRepository.find_one_or_none(
+                session, id=cluster.hyperv_host_id
+            )
+            if not host:
+                raise ValueError(f"Host for cluster {cluster_id} not found")
 
-    create_host_dir_if_not_exists(host.id)
+        create_super_user_creds(cluster_id)
+        create_host_dir_if_not_exists(host.id)
 
-    host_config = {
-        "id": host.id,
-        "host": host.host_fqdn,
-        "port": host.winrm_port,
-        "https": host.https,
-        "disks_path": host.disks_path,
-    }
+        host_config = {
+            "id": host.id,
+            "host": host.host_fqdn,
+            "port": host.winrm_port,
+            "https": host.https,
+            "disks_path": host.disks_path,
+        }
 
-    vm_config = {
-        "cpu": cluster.cpu,
-        "memory": cluster.ram_mb,
-        "disk_size": cluster.storage_gb,
-        "source_disk_path": str(settings.VM_SOURCE_DISK_PATH),
-        "host": host.id,
-        "pg_version": cluster.pg_version,
-    }
+        vm_config = {
+            "cpu": cluster.cpu,
+            "memory": cluster.ram_mb,
+            "disk_size": cluster.storage_gb,
+            "source_disk_path": str(settings.VM_SOURCE_DISK_PATH),
+            "host": host.id,
+            "pg_version": cluster.pg_version,
+            "db_name": cluster.db_name,
+        }
 
-    write_configuration(cluster_id, vm_config, host_config)
+        write_configuration(cluster_id, vm_config, host_config)
 
-    vm_ip, ssh_port, postgres_port = run_terraform_apply(
-        cwd=str(settings.TERRAFORM_DIR_FULL_PATH / str(host_config["id"]))
-    )
-
-    with get_db() as session:
-        ClusterRepository.update(
-            session,
-            cluster_id,
-            postgres_port=postgres_port,
-            ssh_port=ssh_port,
-            host_fqdn=vm_ip,
+        terraform_lock_path = (
+            settings.TERRAFORM_DIR_FULL_PATH / str(host_config["id"]) / "terraform.lock"
         )
 
-    logger.info(f"VM for cluster '{cluster_id}' was created")
+        with FileLock(terraform_lock_path, timeout=1800):
+            clusters_info = run_terraform_apply(
+                cwd=str(settings.TERRAFORM_DIR_FULL_PATH / str(host_config["id"]))
+            )
+
+        cluster_info = clusters_info[cluster_id]
+
+        with get_db() as session:
+            ClusterRepository.update(
+                session,
+                cluster_id,
+                status_id=ClusterStatusEnum.RUNNING,
+                postgres_port=cluster_info["postgres_port"],
+                ssh_port=cluster_info["ssh_port"],
+                host_fqdn=cluster_info["ip"],
+            )
+
+        logger.info(f"VM for cluster '{cluster_id}' was created")
+
+    except Exception as err:
+        logger.exception("Create VM task failed")
+        raise err
 
 
 def create_host_dir_if_not_exists(host_id: int):
-    """Проверяет существует ли папка для хоста и если нет, то создает ее
-    и копирует туда шаблонные файлы.
-    """
-    host_directories = set(os.listdir(str(settings.TERRAFORM_DIR_FULL_PATH)))
-
-    if str(host_id) not in host_directories:
-        os.mkdir(str(settings.TERRAFORM_DIR_FULL_PATH / str(host_id)))
-
-        src = settings.TERRAFORM_DIR_FULL_PATH / "template"
-        dst = settings.TERRAFORM_DIR_FULL_PATH / str(host_id)
-
-        shutil.copytree(src, dst, dirs_exist_ok=True)
+    host_dir = settings.TERRAFORM_DIR_FULL_PATH / str(host_id)
+    if not host_dir.exists():
+        host_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(
+            settings.TERRAFORM_DIR_FULL_PATH / "template",
+            host_dir,
+            dirs_exist_ok=True,
+        )
 
 
 def write_configuration(
     cluster_id: str,
     vm_config: dict[str, Any],
-    host_config: dict[str, Any] | None = None,
+    host_config: dict[str, Any],
 ):
     """Записывает конфигурацию виртуальной машины и хоста в файл
     terraform.tfvars.json для нужного хоста. Создаёт файл если ещё не
     существует.
     """
-    open_mode = "r+"
+
     path = (
         settings.TERRAFORM_DIR_FULL_PATH
         / str(host_config["id"])
         / "terraform.tfvars.json"
     )
-    if not os.path.exists(str(path)):
-        open_mode = "w+"
+    lock_path = path.with_suffix(".json.lock")
 
-    with open(path, open_mode) as f:
-        content = f.read()
-
-        if content:
-            tfvars = json.loads(content)
+    with FileLock(lock_path, timeout=300):
+        if path.exists():
+            content = path.read_text()
+            tfvars = json.loads(content) if content else {}
         else:
             tfvars = {}
 
         tfvars["hyperv_host"] = host_config
+        tfvars.setdefault("vms", {})
+        tfvars["vms"][cluster_id] = vm_config
 
-        if tfvars.get("vms") is None:
-            tfvars["vms"] = {cluster_id: vm_config}
-        else:
-            tfvars["vms"][cluster_id] = vm_config
-
-        f.seek(0)
-        f.write(json.dumps(tfvars))
-        f.truncate()
+        path.write_text(json.dumps(tfvars, indent=2))
 
 
-def run_terraform_apply(cwd: str) -> tuple[str, int, int]:
-    """Выполняет команды terraform init и terraform apply и возвращает
-    ip, ssh_port и postgres_port для созданной ВМ
-    """
-
+def run_terraform_apply(cwd: str) -> dict[str, dict[str, Any]]:
     subprocess.run(["terraform", "init"], cwd=cwd, check=True)
-
     subprocess.run(
-        ["terraform", "apply", "-auto-approve", "-parallelism", "1"],
+        ["terraform", "apply", "-auto-approve"],
         cwd=cwd,
         check=True,
     )
@@ -144,74 +150,97 @@ def run_terraform_apply(cwd: str) -> tuple[str, int, int]:
     )
 
     outputs = json.loads(result.stdout)
+    vm_configs = outputs["vm_configs"]["value"]
 
-    vm_ip = outputs["vm_ip"]["value"]
-    ssh_port = outputs["ssh_port"]["value"]
-    postgres_port = outputs["postgres_port"]["value"]
+    vm_info: dict[str, dict[str, Any]] = {}
 
-    print(type(vm_ip), type(ssh_port), type(postgres_port))
+    for cluster_id, data in vm_configs.items():
+        vm_info[cluster_id] = {
+            "ip": data["ip"]["value"],
+            "ssh_port": data["ssh_port"]["value"],
+            "postgres_port": data["postgres_port"]["value"],
+        }
 
-    return vm_ip, ssh_port, postgres_port
+    return vm_info
 
 
 @dramatiq.actor()
 def rollback_tfvars_file(message_data, exception_data):
-    logger.error(exception_data)
+    logger.error("ROLLBACK STARTED")
+    logger.error("Exception: %s", exception_data)
+    logger.error("Message data: %s", message_data)
 
-    if message_data["options"]["retries"] == MAX_RETRIES:
-        cluster_id = message_data["args"][0]
+    retries = message_data.get("options", {}).get("retries", 0)
+    if retries < MAX_RETRIES:
+        return
 
-        try:
-            with get_db() as session:
-                cluster = ClusterRepository.find_one_or_none(session, id=cluster_id)
+    cluster_id = message_data["args"][0]
 
-                host_id = cluster.hyperv_host_id
+    with get_db() as session:
+        cluster = ClusterRepository.find_one_or_none(session, id=cluster_id)
+        if not cluster:
+            logger.error("Cluster not found during rollback")
+            return
 
-                ClusterRepository.update(
-                    session,
-                    cluster_id,
-                    status_id=ClusterStatusEnum.FAILED,
-                    hyperv_host_id=None,
-                    postgres_port=None,
-                    ssh_port=None,
-                    host_fqdn=None,
-                )
+        host_id = cluster.hyperv_host_id
+        if not host_id:
+            logger.error("host_id is None, rollback aborted")
+            return
 
-                host = HypervHostRepository.find_one_or_none(session, id=host_id)
-                HypervHostRepository.update(
-                    session,
-                    id=host_id,
-                    free_storage=host.free_storage + cluster.storage_gb,
-                    free_ram=host.free_ram + cluster.ram_mb,
-                    free_cpu=host.free_cpu + cluster.cpu,
-                )
-        except Exception as err:
-            logger.error(err)
+        ClusterRepository.update(
+            session,
+            cluster_id,
+            status_id=ClusterStatusEnum.FAILED,
+            hyperv_host_id=None,
+            postgres_port=None,
+            ssh_port=None,
+            host_fqdn=None,
+        )
 
-        open_mode = "r+"
-        path = settings.TERRAFORM_DIR_FULL_PATH / str(host_id) / "terraform.tfvars.json"
-        if not os.path.exists(str(path)):
-            open_mode = "w+"
+        host = HypervHostRepository.find_one_or_none(session, id=host_id)
+        if host:
+            HypervHostRepository.update(
+                session,
+                id=host_id,
+                free_storage=host.free_storage + cluster.storage_gb,
+                free_ram=host.free_ram + cluster.ram_mb,
+                free_cpu=host.free_cpu + cluster.cpu,
+            )
 
-        with open(path, open_mode) as f:
-            content = f.read()
-            if not content:
-                logger.warning(f"Empty file {path}")
-                return
+    path = settings.TERRAFORM_DIR_FULL_PATH / str(host_id) / "terraform.tfvars.json"
+    lock_path = path.with_suffix(".json.lock")
 
-            if content:
-                tfvars = json.loads(content)
+    if not path.exists():
+        logger.warning("tfvars file does not exist: %s", path)
+        return
 
-            if tfvars.get("vms") is None:
-                logger.warning(f"Not 'vms' key in {path}")
-                return
-            else:
-                tfvars["vms"].pop(cluster_id)
+    with FileLock(lock_path, timeout=300):
+        content = path.read_text()
+        if not content:
+            logger.warning("Empty tfvars file: %s", path)
+            return
 
-            f.seek(0)
-            f.write(json.dumps(tfvars))
-            f.truncate()
+        tfvars = json.loads(content)
+        vms = tfvars.get("vms", {})
 
-    print(message_data["options"])
-    print(message_data["options"]["retries"])
-    print(exception_data)
+        if cluster_id in vms:
+            vms.pop(cluster_id)
+            path.write_text(json.dumps(tfvars, indent=2))
+            logger.info("Cluster %s removed from tfvars", cluster_id)
+        else:
+            logger.warning("Cluster %s not found in tfvars", cluster_id)
+
+
+def create_super_user_creds(cluster_id: str):
+    username = helpers.generate_postgres_username()
+    password = helpers.generate_postgres_password()
+
+    client = vault.get_vault_client()
+    status = client.write_secret(
+        path=f"{cluster_id}/users/super",
+        secret={"username": username, "password": password},
+        mount_point="clusters",
+    )
+
+    if not status:
+        raise RuntimeError("Couldn't create vault secret for super user")

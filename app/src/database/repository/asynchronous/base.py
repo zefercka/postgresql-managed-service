@@ -57,6 +57,24 @@ class BaseRepository[T]:
         return result.scalar()
 
     @classmethod
+    async def count_with_deleted_filter(
+        cls, session: AsyncSession, show_deleted: bool = False, **filter
+    ) -> int:
+        """
+        Подсчёт записей с учётом флага show_deleted
+        """
+        query = select(func.count()).select_from(cls.model)
+
+        if filter:
+            query = query.filter_by(**filter)
+
+        if not show_deleted and hasattr(cls.model, "deleted_at"):
+            query = query.filter(cls.model.deleted_at.is_(None))
+
+        result = await session.execute(query)
+        return result.scalar()
+
+    @classmethod
     async def delete(cls, session: AsyncSession, id: int) -> None:
         primary_key_name = cls.model.__table__.primary_key.columns.keys()[0]
         primary_key_column = getattr(cls.model, primary_key_name)

@@ -1,8 +1,9 @@
-from app.src.database.declarations import ClusterStatusEnum
-from app.src.database.models import Cluster, PostgresVersion
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from app.src.database.declarations import ClusterStatusEnum
+from app.src.database.models import Cluster, PostgresVersion
 
 from . import BaseRepository
 

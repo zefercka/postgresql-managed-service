@@ -13,7 +13,7 @@ def generate_user_id() -> int:
     return user_id
 
 
-def generate_cluster_id() -> str:
+def generate_uuid_id() -> str:
     cluster_id = uuid4()
 
     return str(cluster_id)
@@ -84,6 +84,8 @@ def generate_postgres_username(length: int = 6) -> str:
         str: Имя пользователя
     """
 
-    password = [secrets.choice(string.ascii_lowercase) for _ in range(length)]
+    username = [secrets.choice(string.ascii_lowercase) for _ in range(length)]
 
-    secrets.SystemRandom().shuffle(password)
+    secrets.SystemRandom().shuffle(username)
+
+    return "".join(username)

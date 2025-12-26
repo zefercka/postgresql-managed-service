@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.src.database.declarations.hyperv_hosts import HypervHostStatusEnum
+
 
 class BaseHypervHost(BaseModel):
     host_fqdn: str = Field(description="Адрес хоста")
@@ -20,6 +22,17 @@ class BaseHypervHost(BaseModel):
 
 class CreateHypervHost(BaseHypervHost):
     disks_path: str = Field(description="Путь для хранения дисков ВМ")
+
+    username: str = Field(
+        min_length=4,
+        max_length=64,
+        description="Имя пользователя для подключения к Hyper-V хосту",
+    )
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+        description="Пароль пользователя для подключения к Hyper-V хосту",
+    )
 
     @field_validator("disks_path")
     @classmethod
@@ -48,6 +61,16 @@ class HypervHostStatus(BaseModel):
     id: int
     status: str
     description: Optional[str] = Field(default=None)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UpdateHypervHostStatus(BaseModel):
+    status_id: int = Field(
+        description="ID статуса хоста",
+        ge=HypervHostStatusEnum.ON_SERVICE,
+        le=HypervHostStatusEnum.DISABLED,
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

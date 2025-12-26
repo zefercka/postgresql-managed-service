@@ -25,25 +25,24 @@ async def login_via_telegram(
     """
     Выполняет авторизацию пользователя через телеграмм
     """
-    data = telegram_user.model_dump(exclude=["hash"])
-    sorted_keys = sorted(data.keys())
-    data_check_arr = [
-        f"{key}={data[key]}" for key in sorted_keys if data[key] is not None
-    ]
-    data_check = "\n".join(data_check_arr)
 
-    computed_hash = hmac.new(
-        settings.HASH_TELEGRAM_BOT_TOKEN, data_check.encode(), hashlib.sha256
-    ).hexdigest()
+    if settings.TELEGRAM_AUTH_ENABLED:
+        data = telegram_user.model_dump(exclude=["hash"])
+        sorted_keys = sorted(data.keys())
+        data_check_arr = [
+            f"{key}={data[key]}" for key in sorted_keys if data[key] is not None
+        ]
+        data_check = "\n".join(data_check_arr)
 
-    if (
-        not hmac.compare_digest(computed_hash, telegram_user.hash)
-        and telegram_user.id != 0
-    ):
-        raise TelegramAuthError
+        computed_hash = hmac.new(
+            settings.HASH_TELEGRAM_BOT_TOKEN, data_check.encode(), hashlib.sha256
+        ).hexdigest()
 
-    if time.time() - telegram_user.auth_date > settings.TELEGRAM_AUTH_DATA_EXPIRE:
-        raise TelegramAuthDataIsOutdatedError
+        if not hmac.compare_digest(computed_hash, telegram_user.hash):
+            raise TelegramAuthError
+
+        if time.time() - telegram_user.auth_date > settings.TELEGRAM_AUTH_DATA_EXPIRE:
+            raise TelegramAuthDataIsOutdatedError
 
     db_user = await UserRepository.find_one_or_none(session, tg_id=telegram_user.id)
     if db_user is None:

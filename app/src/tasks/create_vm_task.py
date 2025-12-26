@@ -39,6 +39,7 @@ def create_vm_task(cluster_id: str):
         "host": host.host_fqdn,
         "port": host.winrm_port,
         "https": host.https,
+        "disks_path": host.disks_path,
     }
 
     vm_config = {
@@ -47,6 +48,7 @@ def create_vm_task(cluster_id: str):
         "disk_size": cluster.storage_gb,
         "source_disk_path": str(settings.VM_SOURCE_DISK_PATH),
         "host": host.id,
+        "pg_version": cluster.pg_version,
     }
 
     write_configuration(cluster_id, vm_config, host_config)

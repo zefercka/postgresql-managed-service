@@ -1,7 +1,11 @@
 import hashlib
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
+
+from app.load_vault_approle import load_approle_credentials
+
+load_approle_credentials()
 
 
 class Config(BaseSettings):
@@ -13,6 +17,8 @@ class Config(BaseSettings):
     DB_DRIVER: str
 
     REPOSITORY_TYPE: str = "async"
+
+    TELEGRAM_AUTH_ENABLED: bool = True
 
     TELEGRAM_BOT_TOKEN: str
     # Кеш токена генерируется автоматически после инициализации
@@ -34,11 +40,22 @@ class Config(BaseSettings):
     RABBITMQ_VHOST: str
 
     TERRAFORM_DIR: str
-    
+
     VM_SOURCE_DISK_PATH: str
 
     # Путь до приватного ключами для подключения по SSH к серверам
     SERVERS_KEY_PATH: str = "./keys/servers/ssh_key"
+
+    # HashiCorp Vault
+    VAULT_ADDR: str = "http://localhost:8200"
+    VAULT_TOKEN: str = ""
+    VAULT_NAMESPACE: str = ""
+
+    # AppRole authentication (альтернатива токену)
+    VAULT_ROLE_ID: str = ""
+    VAULT_SECRET_ID: str = ""
+
+    VAULT_CLUSTERS_SECRET_PATH: str = "secrets/clusters"
 
     model_config = SettingsConfigDict(
         env_file=".server.env",

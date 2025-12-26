@@ -5,6 +5,9 @@ from app.config import settings
 from app.src.api.admin import app as admin_controller
 from app.src.api.auth.controller import app as auth_controller
 from app.src.api.clusters.controller import app as clusters_controller
+from app.src.dependency import vault
+
+vault.get_vault_client()
 
 app = FastAPI()
 

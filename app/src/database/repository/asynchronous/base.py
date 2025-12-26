@@ -32,6 +32,7 @@ class BaseRepository[T]:
 
         query = update(cls.model).where(primary_key_column == id).values(**data)
         await session.execute(query)
+        await session.flush()
 
     @classmethod
     async def find_all(

@@ -23,3 +23,8 @@ class HostCantBeDeletedError(ConflictError):
         super().__init__(
             detail="На этом HyperV хосте ещё остались кластеры. Перенести их, чтобы удалить хост"
         )
+
+
+class HostCredentialsSaveError(ConflictError):
+    def __init__(self):
+        super().__init__(detail="Создание HyperV хостов временно недоступно")

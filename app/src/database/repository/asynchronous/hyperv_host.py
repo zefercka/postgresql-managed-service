@@ -29,6 +29,17 @@ class HypervHostRepository(BaseRepository[HypervHost]):
         return result.scalar_one()
 
     @staticmethod
+    async def find_one_or_none(session: AsyncSession, **filter) -> HypervHost:
+        query = (
+            select(HypervHost)
+            .options(selectinload(HypervHost.status))
+            .filter_by(**filter)
+            .limit(1)
+        )
+        result = await session.execute(query)
+        return result.scalars().one_or_none()
+
+    @staticmethod
     async def find_host_with_resources(
         session: AsyncSession, cpu: int, storage: int, ram: int, **filter
     ) -> Optional[HypervHost]:
@@ -146,6 +157,34 @@ class HypervHostRepository(BaseRepository[HypervHost]):
         clusters = result.scalars().all()
 
         return clusters
+
+    @staticmethod
+    async def update_status(
+        session: AsyncSession,
+        host_id: int,
+        status_id: int,
+    ) -> HypervHost:
+        """Обновляет статус HyperV хоста и возвращает обновленный объект
+
+        Args:
+            session (AsyncSession): Сессия БД
+            host_id (int): Идентификатор хоста
+            status_id (int): Новый статус
+
+        Returns:
+            HypervHost: Обновленный хост с актуальным статусом
+        """
+        await HypervHostRepository.update(session, host_id, status_id=status_id)
+        await session.flush()
+
+        result = await session.execute(
+            select(HypervHost)
+            .options(selectinload(HypervHost.status))
+            .where(HypervHost.id == host_id)
+            .execution_options(populate_existing=True)
+        )
+
+        return result.scalar_one()
 
 
 class HypervHostAuditRepository(BaseRepository[HypervHostAudit]):

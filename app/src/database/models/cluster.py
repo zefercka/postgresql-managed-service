@@ -72,9 +72,7 @@ class Cluster(Base):
     ssh_port: Mapped[Optional[int]] = mapped_column(
         comment="Порт хоста на который прокинут ssh порт из вм"
     )
-    host_fqdn: Mapped[Optional[str]] = mapped_column(
-        comment="Адрес ВМ внутри NAT сети"
-    )
+    host_fqdn: Mapped[Optional[str]] = mapped_column(comment="Адрес ВМ внутри NAT сети")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -86,5 +84,6 @@ class Cluster(Base):
         nullable=False,
     )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    db_name: Mapped[str] = mapped_column(String(63))
 
     status: Mapped[ClusterStatus] = relationship("ClusterStatus", lazy="selectin")

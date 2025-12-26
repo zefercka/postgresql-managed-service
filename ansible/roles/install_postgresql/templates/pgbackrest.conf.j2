@@ -1,0 +1,16 @@
+[global]
+repo1-path=/var/lib/pgbackrest{{ postgresql_version }}
+repo1-retention-full=4
+repo1-retention-diff=14
+compress-type=zst
+compress-level=3
+start-fast=y
+process-max=4
+spool-path=/var/spool/pgbackrest/{{  postgresql_version }}
+log-level-console=info
+log-level-file=detail
+
+[main]
+pc1-path=/var/lib/postgresql/{{ postgresql_version }}/main
+pg1-port=5432
+archive-async=y

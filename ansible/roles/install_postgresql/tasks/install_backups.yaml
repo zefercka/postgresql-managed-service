@@ -1,0 +1,63 @@
+# - name: Ensure dpkg is configured
+#   become: true
+#   ansible.builtin.command: dpkg --configure -a
+#   changed_when: false
+#   failed_when: false
+
+- name: Install PgBackRest
+  ansible.builtin.apt:
+    name:
+      - pgbackrest
+    state: present
+
+- name: Create pgBackRest directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+  loop:
+    - "/var/lib/pgbackrest/{{ postgresql_version }}"
+    - /var/log/pgbackrest/
+    - "/var/spool/pgbackrest/{{ postgresql_version }}"
+    - "/etc/pgbackrest/"
+
+- name: install pgbackrest conf
+  become: true
+  template:
+    src: pgbackrest.conf.j2
+    dest: "/etc/pgbackrest/pgbackrest.conf"
+
+- name: Set PostgreSQL config params for backups
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_alter_system:
+    login_host: localhost
+    login_user: "{{ db_user }}"
+    login_password: "{{ db_pass }}"
+    login_db: "{{ db_name }}"
+    param: "{{ item.key }}"
+    value: "{{ item.value }}"
+  loop:
+    - { key: wal_level,          value: replica }
+    - { key: archive_mode,       value: on }
+    - { key: archive_command,    value: pgbackrest --stanza=main archive-push %p }
+    - { key: archive_timeout,    value: 60s }
+    - { key: max_wal_senders,    value: 10 }
+    - { key: wal_compression,    value: on }
+
+- name: Restart PostgreSQL
+  become_user: root
+  service:
+    name: "postgresql@{{ postgresql_version }}-main"
+    state: restarted
+
+- name: pgBackRest init and full backup
+  become: true
+  become_user: postgres
+  ansible.builtin.command: "{{ item }}"
+  loop:
+    - pgbackrest --stanza=main --log-level-console=info stanza-create
+    - pgbackrest --stanza=main --type=full backup

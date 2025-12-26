@@ -1,7 +1,11 @@
 import hashlib
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
+
+from app.load_vault_approle import load_approle_credentials
+
+load_approle_credentials()
 
 
 class Config(BaseSettings):
@@ -46,7 +50,7 @@ class Config(BaseSettings):
     VAULT_ADDR: str = "http://localhost:8200"
     VAULT_TOKEN: str = ""
     VAULT_NAMESPACE: str = ""
-    
+
     # AppRole authentication (альтернатива токену)
     VAULT_ROLE_ID: str = ""
     VAULT_SECRET_ID: str = ""

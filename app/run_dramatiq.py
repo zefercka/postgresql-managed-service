@@ -7,14 +7,6 @@ if __name__ == "__main__":
     os.environ["REPOSITORY_TYPE"] = "sync"
     os.environ["TF_LOG"] = "DEBUG"
 
-    from app.load_vault_approle import load_approle_credentials
-
-    load_approle_credentials()
-
-    from app.src.dependency.vault import get_vault_client
-
-    get_vault_client()
-
     dramatiq_main()
 
 

@@ -18,3 +18,6 @@ vault-keys-backup.json
 vault/init/
 vault-backups/
 *.unsealed
+
+# Logs
+*.log

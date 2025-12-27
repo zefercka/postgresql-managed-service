@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 
@@ -16,17 +17,31 @@ from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+
+def parse_queue_name():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("broker_module")
+    parser.add_argument("--queues", "--queue", dest="queue", default="default")
+
+    args, _ = parser.parse_known_args()
+
+    return args.queue
+
+
 if __name__ == "__main__":
     os.environ["DB_DRIVER"] = "postgresql+psycopg2"
     os.environ["REPOSITORY_TYPE"] = "sync"
     os.environ["TF_LOG"] = "DEBUG"
 
-    from config import settings
+    from app.config import settings
+
+    queue_name = parse_queue_name()
 
     # Ресурс с метаданными сервиса
     resource = Resource(
         attributes={
-            SERVICE_NAME: "postgresql-managed-service-terraform-worker",
+            SERVICE_NAME: f"postgresql-managed-service-{queue_name}-worker",
             SERVICE_VERSION: "1.0.0",
         }
     )

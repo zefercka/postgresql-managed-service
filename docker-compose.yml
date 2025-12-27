@@ -216,7 +216,7 @@ services:
       - "--web.enable-remote-write-receiver"
     networks:
       - managed_service_network
-  
+
   loki:
     image: grafana/loki:3.5.8
     container_name: ms-loki
@@ -228,7 +228,7 @@ services:
       - "3100:3100"
     networks:
       - managed_service_network
-  
+
   tempo:
     image: grafana/tempo:main-1fbce80
     container_name: ms-tempo

@@ -75,7 +75,7 @@ RUN chmod 600 /home/ansibleuser/.ssh/id_rsa && \
 
 USER ansibleuser
 
-CMD ["python", "app/run_dramatiq.py", "app.src.tasks.create_cluster_user_task", "--queues", "ansible_queue", "--threads", "8"]
+CMD ["python", "-m", "app.run_dramatiq", "app.src.tasks.create_cluster_user_task", "--queues", "ansible_queue", "--threads", "8"]
 
 FROM python-deps-install AS terraform
 

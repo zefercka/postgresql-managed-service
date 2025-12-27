@@ -20,6 +20,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+from app.config import settings
 from app.src.api.admin import app as admin_controller
 from app.src.api.auth.controller import app as auth_controller
 from app.src.api.cluster_users.controller import app as cluster_users_controller

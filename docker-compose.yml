@@ -12,6 +12,9 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
+      - OPENTELEMETRY_COLLECTOR_HOST=opentelemetry
+      - OPENTELEMETRY_COLLECTOR_PORT_HTTP=4318
+      - OPENTELEMETRY_COLLECTOR_PORT_GRPC=4317
     networks:
       - managed_service_network
 
@@ -40,6 +43,9 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID_FILE=/vault/approle/server-role-id
       - VAULT_SECRET_ID_FILE=/vault/approle/server-secret-id
+      - OPENTELEMETRY_COLLECTOR_HOST=opentelemetry
+      - OPENTELEMETRY_COLLECTOR_PORT_HTTP=4318
+      - OPENTELEMETRY_COLLECTOR_PORT_GRPC=4317
     ports:
       - "8000:8000"
     volumes:
@@ -109,6 +115,9 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID_FILE=/vault/approle/server-role-id
       - VAULT_SECRET_ID_FILE=/vault/approle/server-secret-id
+      - OPENTELEMETRY_COLLECTOR_HOST=opentelemetry
+      - OPENTELEMETRY_COLLECTOR_PORT_HTTP=4318
+      - OPENTELEMETRY_COLLECTOR_PORT_GRPC=4317
     volumes:
       - ./ansible:/opt/postgresql-managed-service/ansible
     networks:
@@ -137,6 +146,9 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID_FILE=/vault/approle/terraform-role-id
       - VAULT_SECRET_ID_FILE=/vault/approle/terraform-secret-id
+      - OPENTELEMETRY_COLLECTOR_HOST=opentelemetry
+      - OPENTELEMETRY_COLLECTOR_PORT_HTTP=4318
+      - OPENTELEMETRY_COLLECTOR_PORT_GRPC=4317
     volumes:
       - terraform_data:/opt/postgresql-managed-service/terraform
       - vault_approle:/vault/approle:ro
@@ -266,6 +278,9 @@ volumes:
   vault_init:      # Unseal ключи и root token
   vault_logs:      # Audit логи
   vault_approle:   # AppRole credentials для сервисов
+  grafana_data:    # Данные Grafana
+  prometheus_data: # Данные Prometheus
+  tempo_data:      # Данные Tempo
 
 networks:
   managed_service_network:

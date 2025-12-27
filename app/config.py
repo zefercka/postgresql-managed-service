@@ -1,13 +1,13 @@
 import hashlib
-
-from pydantic_settings import BaseSettings, SettingsConfigDict00
 import logging
 from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from load_vault_approle import load_approle_credentials
+from app.load_vault_approle import load_approle_credentials
+
+load_approle_credentials()
 
 
 class Config(BaseSettings):
